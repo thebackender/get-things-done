@@ -82,7 +82,7 @@ export function render(view) {
       <span class="spacer"></span>
       <span class="legend">
         <span><svg width="30" height="10"><line x1="2" y1="5" x2="28" y2="5" class="edge child"/></svg> subtask</span>
-        <span><svg width="30" height="10"><line x1="2" y1="5" x2="22" y2="5" class="edge dep" marker-end="url(#arrow)"/></svg> A ⇢ B: B waits for A</span>
+        <span><svg width="30" height="10"><line x1="2" y1="5" x2="22" y2="5" class="edge dep" marker-end="url(#arrow)"/></svg> A ⇢ B: A blocks B</span>
         <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#9a9893" class="ring-waiting"/></svg> waiting</span>
       </span>
     </div>
@@ -91,7 +91,7 @@ export function render(view) {
         <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>
         <g class="viewport"><g class="edges"></g><g class="nodes"></g></g>
       </svg>
-      ${nodes.length ? '' : empty('No links yet. Set a parent or "Depends on" in the task editor, or uncheck "linked only".')}
+      ${nodes.length ? '' : empty('No links yet. Set a parent, "Blocked by" or "Blocking" in the task editor, or uncheck "linked only".')}
       ${usedRoots.length || hasNoProject ? `<div class="cat-legend">
         ${usedRoots.map((p) => `<span><i class="dot" style="--c:${p.color}"></i>${esc(p.name)}</span>`).join('')}
         ${hasNoProject ? `<span><i class="dot" style="--c:${OTHER_COLOR}"></i>no project</span>` : ''}

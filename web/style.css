@@ -310,6 +310,7 @@ dialog { overflow: auto; }
 .editor details[open] summary { margin-bottom: 8px; }
 .dep-filter { width: 100%; margin-bottom: 6px; }
 .dep-list { max-height: 180px; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.dep-list label:has(input:disabled) { color: var(--muted); cursor: default; }
 .subtasks, .history, .progress-list { margin: 0 0 8px; padding-left: 18px; }
 .history { color: var(--ink-2); font-size: 13px; }
 .history time, .progress-list time { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }

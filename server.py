@@ -383,6 +383,25 @@ def check_task_refs(data, task):
         find(data["projects"], task["project_id"], "Project")
 
 
+def apply_blocking(data, task, payload):
+    """payload["blocking"] lists the tasks this one blocks: put this task into their depends_on
+    ("Blocked by") and take it out of every other task's. Not stored on the task itself."""
+    if "blocking" not in payload:
+        return
+    wanted = set(as_int_list(payload["blocking"], "blocking")) - {task["id"]}
+    for other in data["tasks"]:
+        if other is task:
+            continue
+        has = task["id"] in other["depends_on"]
+        if other["id"] in wanted and not has:
+            other["depends_on"].append(task["id"])
+        elif has and other["id"] not in wanted:
+            other["depends_on"].remove(task["id"])
+    for other in data["tasks"]:
+        if other["id"] in wanted and creates_dependency_cycle(data["tasks"], other["id"], other["depends_on"]):
+            raise ApiError(f'"{other["title"]}" cannot both block this task and be blocked by it')
+
+
 def goal_sum(task):
     return sum(entry["value"] for entry in task["progress"])
 
@@ -422,6 +441,7 @@ def create_task(data, payload):
     task = {"id": next_id(data["tasks"]), **copy.deepcopy(TASK_DEFAULTS), **fields, "created": today()}
     data["tasks"].append(task)
     check_task_refs(data, task)
+    apply_blocking(data, task, payload)
     goal_reached = apply_goal(task)
     apply_done_at(task)
     log(data, task["id"], "created", None, task["title"])
@@ -436,6 +456,7 @@ def update_task(data, task_id, payload):
     fields = clean_task(payload)
     task.update(fields)
     check_task_refs(data, task)
+    apply_blocking(data, task, payload)
     goal_reached = False
     if "progress" in fields or "target" in fields:
         goal_reached = apply_goal(task)

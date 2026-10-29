@@ -20,6 +20,20 @@ const NEW_TASK = {
 
 const NEW_PROJECT = '__new__';
 
+/** A filterable checkbox list of other tasks (used for "Blocked by" and "Blocking"). */
+function relationSection(name, title, hint, tasks, selected) {
+  const sorted = [...tasks].sort((a, b) => selected.includes(b.id) - selected.includes(a.id) ||
+    (a.status === 'done') - (b.status === 'done') || a.title.localeCompare(b.title, 'ru'));
+  return `<details ${selected.length ? 'open' : ''}>
+    <summary>${title} <span class="count rel-count" data-for="${name}">${selected.length}</span> <span class="muted">· ${hint}</span></summary>
+    ${sorted.length ? `<input type="search" class="dep-filter" placeholder="Filter…">
+    <div class="dep-list">${sorted.map((d) => `<label class="check" data-title="${esc(d.title.toLowerCase())}">
+      <input type="checkbox" name="${name}" value="${d.id}" ${selected.includes(d.id) ? 'checked' : ''}>
+      ${esc(d.title)}${d.status === 'done' ? ' <span class="muted">(done)</span>' : ''}</label>`).join('')}</div>`
+    : '<p class="muted">No other tasks yet.</p>'}
+  </details>`;
+}
+
 const FIELD_NAMES = {
   status: 'status', sprint_id: 'sprint', priority: 'priority', due: 'due', progress: 'progress',
 };
@@ -54,9 +68,10 @@ export function openTaskEditor(task = null, preset = {}) {
   const banned = new Set(isNew ? [] : [t.id, ...descendants(t.id).map((d) => d.id)]);
   const parents = store.tasks.filter((x) => !banned.has(x.id) && x.status !== 'done' || x.id === t.parent_id)
     .sort((a, b) => a.title.localeCompare(b.title, 'ru'));
-  const deps = store.tasks.filter((x) => x.id !== t.id)
-    .sort((a, b) => t.depends_on.includes(b.id) - t.depends_on.includes(a.id) ||
-      (a.status === 'done') - (b.status === 'done') || a.title.localeCompare(b.title, 'ru'));
+  // "Blocked by" is stored on this task (depends_on). "Blocking" is the reverse: tasks whose depends_on holds this one.
+  const blockedBy = t.depends_on;
+  const blocking = isNew ? [] : store.tasks.filter((x) => x.depends_on.includes(t.id)).map((x) => x.id);
+  const others = store.tasks.filter((x) => x.id !== t.id);
   const sprints = store.sprints.filter((s) => s.status !== 'closed' || s.id === t.sprint_id).sort(sprintOrder);
   const kids = isNew ? [] : childrenOf(t.id);
   const history = isNew ? [] : store.history.filter((h) => h.task_id === t.id).slice(-10).reverse();
@@ -104,14 +119,8 @@ export function openTaskEditor(task = null, preset = {}) {
       </div>
     </fieldset>
 
-    <details ${t.depends_on.length ? 'open' : ''}>
-      <summary>Depends on <span class="count dep-count">${t.depends_on.length}</span></summary>
-      ${deps.length ? `<input type="search" class="dep-filter" placeholder="Filter…">
-      <div class="dep-list">${deps.map((d) => `<label class="check" data-title="${esc(d.title.toLowerCase())}">
-        <input type="checkbox" name="depends_on" value="${d.id}" ${t.depends_on.includes(d.id) ? 'checked' : ''}>
-        ${esc(d.title)}${d.status === 'done' ? ' <span class="muted">(done)</span>' : ''}</label>`).join('')}</div>`
-      : '<p class="muted">No other tasks yet.</p>'}
-    </details>
+    ${relationSection('depends_on', 'Blocked by', 'tasks that must be done before this one', others, blockedBy)}
+    ${relationSection('blocking', 'Blocking', 'tasks that wait for this one', others, blocking)}
 
     ${isNew ? '' : `<details ${kids.length ? 'open' : ''}>
       <summary>Subtasks <span class="count">${kids.length}</span></summary>
@@ -172,6 +181,22 @@ export function openTaskEditor(task = null, preset = {}) {
     newProjectRow.hidden = true;
   }
 
+  // A task can't be both "Blocked by" and "Blocking" (that would be a cycle): checking it in one list disables it in the other.
+  const checkedIds = (name) => [...form.querySelectorAll(`input[name=${name}]:checked`)].map((c) => Number(c.value));
+  function syncRelations() {
+    const pairs = [['depends_on', 'blocking', 'Blocking'], ['blocking', 'depends_on', 'Blocked by']];
+    for (const [name, other, otherTitle] of pairs) {
+      const taken = new Set(checkedIds(other));
+      form.querySelectorAll(`input[name=${name}]`).forEach((c) => {
+        c.disabled = taken.has(Number(c.value));
+        c.closest('label').title = c.disabled ? `Already in "${otherTitle}"` : '';
+      });
+      const count = form.querySelector(`.rel-count[data-for=${name}]`);
+      if (count) count.textContent = checkedIds(name).length;
+    }
+  }
+  syncRelations();
+
   form.onsubmit = async (e) => {
     e.preventDefault();
     const title = el.title.value.trim();
@@ -201,7 +226,8 @@ export function openTaskEditor(task = null, preset = {}) {
       sprint_id: el.sprint_id.value ? Number(el.sprint_id.value) : null,
       notes: el.notes.value,
       waiting_for: el.waiting_for.value.trim(),
-      depends_on: [...form.querySelectorAll('input[name=depends_on]:checked')].map((c) => Number(c.value)),
+      depends_on: checkedIds('depends_on'),
+      blocking: checkedIds('blocking'), // the server updates "Blocked by" on those tasks
       target,
       unit: goal ? el.unit.value.trim() : '',
       progress,
@@ -248,7 +274,7 @@ export function openTaskEditor(task = null, preset = {}) {
     if (e.target.name === 'target' || e.target.name === 'unit') renderProgress();
     if (e.target.classList.contains('dep-filter')) {
       const q = e.target.value.trim().toLowerCase();
-      form.querySelectorAll('.dep-list label').forEach((l) => (l.hidden = !l.dataset.title.includes(q)));
+      e.target.nextElementSibling.querySelectorAll('label').forEach((l) => (l.hidden = !l.dataset.title.includes(q)));
     }
   };
 
@@ -262,9 +288,7 @@ export function openTaskEditor(task = null, preset = {}) {
       } else lastProject = projectSelect.value;
     }
     if (e.target.name === 'is_goal') form.querySelector('.goal-body').hidden = !e.target.checked;
-    if (e.target.name === 'depends_on') {
-      form.querySelector('.dep-count').textContent = form.querySelectorAll('input[name=depends_on]:checked').length;
-    }
+    if (e.target.name === 'depends_on' || e.target.name === 'blocking') syncRelations();
   };
 
   // Enter in the progress and new project boxes adds an item instead of submitting the form.
