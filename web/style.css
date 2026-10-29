@@ -367,6 +367,12 @@ dialog { overflow: auto; }
 .progress-list { list-style: none; padding: 0; max-height: 140px; overflow: auto; }
 .progress-list li { display: flex; align-items: center; gap: 4px; }
 
+#confirm-dialog { width: min(420px, calc(100vw - 32px)); }
+.confirm { padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 10px; }
+.confirm h3 { font-size: 16px; margin: 0; }
+.confirm p { margin: 0; color: var(--ink-2); }
+.confirm footer { display: flex; gap: 8px; margin-top: 6px; }
+
 /* ---------- toast ---------- */
 
 #toast {

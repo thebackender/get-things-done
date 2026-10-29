@@ -10,8 +10,46 @@ import {
 
 const dlg = document.getElementById('dialog');
 
-// Clicking the dimmed backdrop closes the dialog.
-dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+// Every way of closing (✕, Cancel, Esc, click on the backdrop) goes through requestClose(),
+// so the task editor can warn about unsaved changes first.
+let beforeClose = null; // async () => boolean: may the dialog close now? Set by every editor when it opens.
+async function requestClose() {
+  if (!beforeClose || (await beforeClose())) dlg.close();
+}
+dlg.addEventListener('click', (e) => { if (e.target === dlg) requestClose(); });
+dlg.addEventListener('cancel', (e) => { e.preventDefault(); requestClose(); });
+
+/** "Unsaved changes" warning. Resolves to 'save', 'discard' or 'keep'. */
+const confirmDlg = document.getElementById('confirm-dialog');
+function askUnsaved() {
+  return new Promise((resolve) => {
+    confirmDlg.innerHTML = `<form method="dialog" class="confirm">
+      <h3>Unsaved changes</h3>
+      <p>You changed this task but didn't save it.</p>
+      <footer>
+        <button value="keep">Keep editing</button>
+        <span class="spacer"></span>
+        <button value="discard" class="danger">Discard</button>
+        <button value="save" class="primary" autofocus>Save</button>
+      </footer>
+    </form>`;
+    let answered = false;
+    const answer = (value) => {
+      if (answered) return;
+      answered = true;
+      if (confirmDlg.open) confirmDlg.close(value);
+      resolve(value);
+    };
+    // Answer right on click instead of waiting for the dialog's close event, which arrives later.
+    confirmDlg.querySelectorAll('button[value]').forEach((b) => {
+      b.onclick = (e) => { e.preventDefault(); answer(b.value); };
+    });
+    confirmDlg.onclick = (e) => { if (e.target === confirmDlg) answer('keep'); }; // backdrop
+    // Esc: handled on "cancel", which fires right away (a late "close" event could answer the next question).
+    confirmDlg.oncancel = (e) => { e.preventDefault(); answer('keep'); };
+    confirmDlg.showModal();
+  });
+}
 
 const NEW_TASK = {
   title: '', parent_id: null, status: 'todo', priority: 0, project_id: null, due: null,
@@ -197,24 +235,48 @@ export function openTaskEditor(task = null, preset = {}) {
   }
   syncRelations();
 
-  form.onsubmit = async (e) => {
+  // ---- unsaved changes: compare the form now with how it looked when the editor opened ----
+  const snapshot = () => JSON.stringify([...new FormData(form), ['progress', progress]]);
+  let initial = snapshot();
+  const isDirty = () => snapshot() !== initial;
+  beforeClose = async () => {
+    if (!isDirty()) return true;
+    const answer = await askUnsaved();
+    if (answer === 'save') await save(); // closes the editor itself when the task is valid
+    return answer === 'discard';
+  };
+  /** Run next() (e.g. open another task) after dealing with unsaved changes. */
+  async function leaveThen(next) {
+    if (isDirty()) {
+      const answer = await askUnsaved();
+      if (answer === 'keep' || (answer === 'save' && !(await save()))) return;
+    }
+    next();
+  }
+
+  form.onsubmit = (e) => {
     e.preventDefault();
+    save();
+  };
+
+  /** Validate and save. Returns true when the task was sent to the server. */
+  async function save() {
     const title = el.title.value.trim();
     if (!title) {
       el.title.classList.add('invalid');
       el.title.focus();
-      return;
+      return false;
     }
     // A new project typed in but not added yet still counts.
     if (!newProjectRow.hidden && newProjectInput.value.trim()) await addProject();
     const due = readDate(el.due, 'Due date');
-    if (due === undefined) return;
+    if (due === undefined) return false;
     const goal = el.is_goal.checked;
     const target = goal ? Number(el.target.value) : null;
     if (goal && !(target > 0)) {
       toast('Set a target greater than zero', 'error');
       el.target.focus();
-      return;
+      return false;
     }
     const data = {
       title,
@@ -235,19 +297,20 @@ export function openTaskEditor(task = null, preset = {}) {
     dlg.close();
     if (isNew) await createTask(data);
     else await updateTask(t.id, data);
-  };
+    return true;
+  }
 
   form.onclick = (e) => {
     const open = e.target.closest('[data-open]');
     if (open) {
       e.preventDefault();
-      return openTaskEditor(taskById(Number(open.dataset.open)));
+      return leaveThen(() => openTaskEditor(taskById(Number(open.dataset.open))));
     }
     const act = e.target.closest('[data-act]')?.dataset.act;
-    if (act === 'close') dlg.close();
+    if (act === 'close') requestClose();
     if (act === 'add-project') addProject();
     if (act === 'cancel-project') newProjectRow.hidden = true;
-    if (act === 'add-sub') openTaskEditor(null, { parent_id: t.id, project_id: t.project_id, sprint_id: t.sprint_id });
+    if (act === 'add-sub') leaveThen(() => openTaskEditor(null, { parent_id: t.id, project_id: t.project_id, sprint_id: t.sprint_id }));
     if (act === 'delete') {
       const n = descendants(t.id).length;
       if (confirm(`Delete "${t.title}"${n ? ` and its ${n} subtask(s)` : ''}?`)) {
@@ -305,6 +368,7 @@ export function openTaskEditor(task = null, preset = {}) {
   if (!dlg.open) dlg.showModal();
   dlg.scrollTop = 0;
   if (isNew) el.title.focus();
+  initial = snapshot(); // after everything is rendered, so the starting state counts as "no changes"
 }
 
 /** Open the sprint editor. sprint = null creates a new sprint. */
@@ -317,6 +381,7 @@ export function openSprintEditor(sprint = null) {
     s = { name: `Sprint ${store.sprints.length + 1}`, start, end: addDays(start, 6), goal: '', status: 'planned' };
   }
   const count = isNew ? 0 : store.tasks.filter((x) => x.sprint_id === s.id).length;
+  beforeClose = null; // the sprint editor closes without asking
 
   dlg.innerHTML = `
   <form class="editor narrow" novalidate>

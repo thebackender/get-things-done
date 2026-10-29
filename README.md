@@ -50,7 +50,7 @@ To roll back, stop the server and copy a backup over `data/planner.json`.
 | Field | Meaning |
 |---|---|
 | `status` | `todo`, `doing`, `waiting`, `done` |
-| `priority` | `-1` 🧊 someday, `0` normal, `1` 🔥, `2` 🔥🔥, `3` 🔥🔥🔥 |
+| `priority` | `3` critical ★, `2` highest ⌃⌃, `1` high ⌃, `0` medium = (default), `-1` low ⌄, `-2` lowest ⌄⌄ |
 | `parent_id` | parent task or `null` |
 | `project_id` | project or subproject, or `null` |
 | `depends_on` | "Blocked by": ids of tasks that must be done first. The editor's "Blocking" section edits the same links from the other side |
