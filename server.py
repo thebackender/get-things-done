@@ -48,9 +48,12 @@ TASK_DEFAULTS = {
     "progress": [],
     "created": None,
     "done_at": None,
+    "is_deleted": False,
 }
-SPRINT_DEFAULTS = {"name": "", "start": None, "end": None, "goal": "", "status": "planned"}
-PROJECT_DEFAULTS = {"name": "", "parent_id": None, "color": "#9a9893", "is_active": True}
+SPRINT_DEFAULTS = {"name": "", "start": None, "end": None, "goal": "", "status": "planned", "is_deleted": False}
+PROJECT_DEFAULTS = {"name": "", "parent_id": None, "color": "#9a9893", "is_active": True, "is_deleted": False}
+# Deleting never removes records: it sets is_deleted. Deleted items are hidden from the UI
+# but stay in planner.json with all their links, so setting is_deleted back to false restores them.
 
 # Categorical palette (same as the UI). New top-level projects take the first unused color.
 PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
@@ -104,8 +107,13 @@ def load():
     return data
 
 
+def live(items):
+    """Items that are not soft-deleted."""
+    return [item for item in items if not item.get("is_deleted")]
+
+
 def next_color(projects):
-    used = {p["color"].lower() for p in projects if p["parent_id"] is None}
+    used = {p["color"].lower() for p in live(projects) if p["parent_id"] is None}
     return next((color for color in PALETTE if color not in used), OTHER_COLOR)
 
 
@@ -168,10 +176,27 @@ def mutate(fn, *args):
 
 
 def get_state():
+    """What the UI sees: deleted items are left out, and links pointing at them are shown as empty
+    (a task in a deleted sprint shows in the backlog). The file itself keeps the links."""
     with lock:
         data = load()
-        data["can_undo"] = bool(undo_stack)
-        return data
+    projects, sprints, tasks = live(data["projects"]), live(data["sprints"]), live(data["tasks"])
+    project_ids = {p["id"] for p in projects}
+    sprint_ids = {s["id"] for s in sprints}
+    task_ids = {t["id"] for t in tasks}
+    shown = []
+    for task in tasks:
+        view = dict(task)
+        if view["project_id"] not in project_ids:
+            view["project_id"] = None
+        if view["sprint_id"] not in sprint_ids:
+            view["sprint_id"] = None
+        if view["parent_id"] not in task_ids:
+            view["parent_id"] = None
+        view["depends_on"] = [d for d in view["depends_on"] if d in task_ids]
+        shown.append(view)
+    return {"tasks": shown, "sprints": sprints, "projects": projects,
+            "history": data["history"], "can_undo": bool(undo_stack)}
 
 
 def undo():
@@ -271,7 +296,7 @@ def clean_task(payload):
     """Keep only known task fields and coerce them to the right types."""
     out = {}
     for key, value in payload.items():
-        if key not in TASK_DEFAULTS or key in ("created", "done_at"):
+        if key not in TASK_DEFAULTS or key in ("created", "done_at", "is_deleted"):
             continue
         if key == "title":
             value = as_str(value).strip()
@@ -330,13 +355,15 @@ def clean_sprint(payload):
 # ---------- tasks ----------
 
 def find(items, item_id, what="Task"):
+    """A live (not deleted) item by id."""
     for item in items:
-        if item["id"] == item_id:
+        if item["id"] == item_id and not item.get("is_deleted"):
             return item
     raise ApiError(f"{what} #{item_id} not found", 404)
 
 
 def next_id(items):
+    """Counts deleted items too, so an id is never reused."""
     return max((item["id"] for item in items), default=0) + 1
 
 
@@ -352,7 +379,7 @@ def descendant_ids(tasks, task_id):
 
 
 def creates_dependency_cycle(tasks, task_id, depends_on):
-    by_id = {t["id"]: t for t in tasks}
+    by_id = {t["id"]: t for t in live(tasks)}
     seen, stack = set(), list(depends_on)
     while stack:
         current = stack.pop()
@@ -365,21 +392,25 @@ def creates_dependency_cycle(tasks, task_id, depends_on):
     return False
 
 
-def check_task_refs(data, task):
+def check_task_refs(data, task, changed=None):
+    """Validate links. changed = fields set by this request (None: all, for a new task).
+    Unchanged links may point at soft-deleted items and are kept as they are."""
     tasks = data["tasks"]
-    ids = {t["id"] for t in tasks}
+    ids = {t["id"] for t in live(tasks)}
+    check = (lambda key: True) if changed is None else (lambda key: key in changed)
     parent = task["parent_id"]
-    if parent is not None:
+    if parent is not None and check("parent_id"):
         if parent not in ids:
             raise ApiError("Parent task not found")
         if parent == task["id"] or parent in descendant_ids(tasks, task["id"]):
             raise ApiError("A task cannot be a subtask of itself or of its own subtask")
-    task["depends_on"] = [d for d in task["depends_on"] if d != task["id"] and d in ids]
+    if check("depends_on"):
+        task["depends_on"] = [d for d in task["depends_on"] if d != task["id"] and d in ids]
     if creates_dependency_cycle(tasks, task["id"], task["depends_on"]):
         raise ApiError("Dependencies form a cycle: the tasks would wait for each other forever")
-    if task["sprint_id"] is not None:
+    if task["sprint_id"] is not None and check("sprint_id"):
         find(data["sprints"], task["sprint_id"], "Sprint")
-    if task["project_id"] is not None:
+    if task["project_id"] is not None and check("project_id"):
         find(data["projects"], task["project_id"], "Project")
 
 
@@ -389,7 +420,7 @@ def apply_blocking(data, task, payload):
     if "blocking" not in payload:
         return
     wanted = set(as_int_list(payload["blocking"], "blocking")) - {task["id"]}
-    for other in data["tasks"]:
+    for other in live(data["tasks"]):
         if other is task:
             continue
         has = task["id"] in other["depends_on"]
@@ -455,7 +486,7 @@ def update_task(data, task_id, payload):
     before = copy.deepcopy(task)
     fields = clean_task(payload)
     task.update(fields)
-    check_task_refs(data, task)
+    check_task_refs(data, task, fields)
     apply_blocking(data, task, payload)
     goal_reached = False
     if "progress" in fields or "target" in fields:
@@ -474,14 +505,13 @@ def batch_update(data, payload):
 
 
 def delete_task(data, task_id):
+    """Soft delete: the task and its subtasks get is_deleted; links to them stay in the file."""
     task = find(data["tasks"], task_id)
-    removed = {task_id} | descendant_ids(data["tasks"], task_id)
-    for t in data["tasks"]:
+    removed = {task_id} | descendant_ids(live(data["tasks"]), task_id)
+    for t in live(data["tasks"]):
         if t["id"] in removed:
+            t["is_deleted"] = True
             log(data, t["id"], "deleted", t["title"], None)
-    data["tasks"] = [t for t in data["tasks"] if t["id"] not in removed]
-    for t in data["tasks"]:
-        t["depends_on"] = [d for d in t["depends_on"] if d not in removed]
     return {"ok": True, "deleted": sorted(removed), "title": task["title"]}
 
 
@@ -506,14 +536,14 @@ def check_sprint(data, sprint):
     if sprint["start"] and sprint["end"] and sprint["end"] < sprint["start"]:
         raise ApiError("Sprint end is before its start")
     if sprint["status"] == "active":
-        for other in data["sprints"]:
+        for other in live(data["sprints"]):
             if other is not sprint and other["status"] == "active":
                 raise ApiError(f"Sprint \"{other['name']}\" is already active. Close it first.")
 
 
 def release_sprint_tasks(data, sprint_id, only_unfinished):
     moved = 0
-    for task in data["tasks"]:
+    for task in live(data["tasks"]):
         if task["sprint_id"] == sprint_id and not (only_unfinished and task["status"] == "done"):
             log(data, task["id"], "sprint_id", sprint_id, None)
             task["sprint_id"] = None
@@ -543,9 +573,10 @@ def update_sprint(data, sprint_id, payload):
 
 
 def delete_sprint(data, sprint_id):
-    find(data["sprints"], sprint_id, "Sprint")
-    moved = release_sprint_tasks(data, sprint_id, only_unfinished=False)
-    data["sprints"] = [s for s in data["sprints"] if s["id"] != sprint_id]
+    """Soft delete. Its tasks keep sprint_id in the file but show up in the backlog."""
+    sprint = find(data["sprints"], sprint_id, "Sprint")
+    sprint["is_deleted"] = True
+    moved = sum(1 for t in live(data["tasks"]) if t["sprint_id"] == sprint_id)
     return {"ok": True, "moved_to_backlog": moved}
 
 
@@ -570,7 +601,7 @@ def clean_project_name(value):
 
 
 def sibling_named(data, name, parent_id, exclude=None):
-    return next((p for p in data["projects"]
+    return next((p for p in live(data["projects"])
                  if p["name"] == name and p["parent_id"] == parent_id and p is not exclude), None)
 
 
@@ -583,7 +614,7 @@ def check_parent(data, parent_id, project=None):
     if project is not None:
         if parent is project:
             raise ApiError("A project cannot be its own parent")
-        if any(p["parent_id"] == project["id"] for p in data["projects"]):
+        if any(p["parent_id"] == project["id"] for p in live(data["projects"])):
             raise ApiError("This project has subprojects, so it cannot become a subproject itself")
 
 
@@ -639,15 +670,14 @@ def update_project(data, project_id, body):
 
 
 def delete_project(data, project_id):
-    """Deletes the project and its subprojects; their tasks stay, just without a project."""
+    """Soft delete of the project and its subprojects. Their tasks keep project_id in the file
+    but show up without a project."""
     find(data["projects"], project_id, "Project")
-    removed = {project_id} | {p["id"] for p in data["projects"] if p["parent_id"] == project_id}
-    data["projects"] = [p for p in data["projects"] if p["id"] not in removed]
-    cleared = 0
-    for task in data["tasks"]:
-        if task["project_id"] in removed:
-            task["project_id"] = None
-            cleared += 1
+    removed = {project_id} | {p["id"] for p in live(data["projects"]) if p["parent_id"] == project_id}
+    for project in data["projects"]:
+        if project["id"] in removed:
+            project["is_deleted"] = True
+    cleared = sum(1 for t in live(data["tasks"]) if t["project_id"] in removed)
     return {"ok": True, "deleted": len(removed), "cleared": cleared}
 
 

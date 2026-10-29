@@ -20,7 +20,7 @@ The server listens on `127.0.0.1` only, so it isn't reachable from the network.
 | Sprint | Board for the active sprint: To do / In progress / Waiting / Done. Drag cards between columns |
 | Backlog | Tasks without a sprint. Drag a task into a sprint and its unfinished subtasks come along. Create, start and close sprints here |
 | Calendar | Tasks on their due dates. Click a day to add a task, drag a task to move its due date |
-| Graph | Tasks as nodes. Solid line: subtask. Dashed arrow A ⇢ B: B waits for A |
+| Graph | Tasks as nodes. Solid line: subtask. Dashed arrow A ⇢ B: A blocks B |
 | Stats | Summary, done per week, sprint burndown, projects, priorities, velocity, goals |
 | Settings | Projects and subprojects: create, rename, delete, pick a color, mark active or inactive |
 
@@ -33,6 +33,12 @@ The server listens on `127.0.0.1` only, so it isn't reachable from the network.
 ## Data
 
 Everything is in `data/planner.json`. You can edit it by hand; the page picks up changes on reload.
+
+Deleting is always a soft delete: tasks, sprints and projects get `"is_deleted": true` and disappear from the UI,
+but stay in the file with all their links. To restore one, set it back to `false` (or press Ctrl+Z right away).
+While something is deleted, links to it are ignored: a task in a deleted sprint shows in the backlog,
+a task in a deleted project shows without a project, and a deleted blocker no longer blocks.
+Editing a task in the UI drops its links to deleted items.
 
 The UI shows and accepts dates as `DD.MM.YYYY`; the file stores them as `YYYY-MM-DD`.
 
@@ -47,7 +53,7 @@ To roll back, stop the server and copy a backup over `data/planner.json`.
 | `priority` | `-1` 🧊 someday, `0` normal, `1` 🔥, `2` 🔥🔥, `3` 🔥🔥🔥 |
 | `parent_id` | parent task or `null` |
 | `project_id` | project or subproject, or `null` |
-| `depends_on` | ids of tasks that must be done first |
+| `depends_on` | "Blocked by": ids of tasks that must be done first. The editor's "Blocking" section edits the same links from the other side |
 | `sprint_id` | sprint or `null` (backlog) |
 | `waiting_for` | what or who you're waiting for (with status `waiting`) |
 | `target`, `unit`, `progress` | measurable goal, e.g. "10 h", with `{date, value}` entries. When the sum reaches the target, the task is marked done |
