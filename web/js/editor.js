@@ -4,7 +4,7 @@ import {
   createTask, updateTask, deleteTask, createSprint, updateSprint, deleteSprint,
 } from './store.js';
 import {
-  PRIORITIES, STATUSES, esc, opt, today, addDays, fmtDate, fmtTs, fmtNum, statusName, prioName, toast,
+  PRIORITIES, STATUSES, esc, opt, prioIcon, today, addDays, fmtDate, fmtTs, fmtNum, statusName, prioName, toast,
   dateInput, bindDateInputs, readDate,
 } from './util.js';
 
@@ -88,7 +88,7 @@ export function openTaskEditor(task = null, preset = {}) {
     <input name="title" class="title-input" placeholder="What needs to be done?" value="${esc(t.title)}" autocomplete="off">
     <div class="grid">
       <label>Status<select name="status">${STATUSES.map((s) => opt(s.value, s.name, t.status)).join('')}</select></label>
-      <label>Priority<select name="priority">${PRIORITIES.map((p) => opt(p.value, `${p.icon} ${p.name}`.trim(), t.priority)).join('')}</select></label>
+      <label>Priority<span class="with-icon"><span class="prio-preview">${prioIcon(t.priority)}</span><select name="priority">${PRIORITIES.map((p) => opt(p.value, p.name, t.priority)).join('')}</select></span></label>
       <div class="field">Project
         <select name="project_id">
           <option value="">— none —</option>
@@ -280,6 +280,7 @@ export function openTaskEditor(task = null, preset = {}) {
 
   form.onchange = (e) => {
     if (e.target.name === 'status') form.querySelector('.waiting-row').hidden = e.target.value !== 'waiting';
+    if (e.target.name === 'priority') form.querySelector('.prio-preview').innerHTML = prioIcon(Number(e.target.value));
     if (e.target === projectSelect) {
       if (projectSelect.value === NEW_PROJECT) {
         projectSelect.value = lastProject;

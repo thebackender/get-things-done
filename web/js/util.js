@@ -1,13 +1,37 @@
 // Shared constants and small helpers with no dependencies.
 
+// Stored as a number; higher is more urgent. Medium (0) is the default for new tasks.
 export const PRIORITIES = [
-  { value: 3, icon: '🔥🔥🔥', name: 'Critical' },
-  { value: 2, icon: '🔥🔥', name: 'High' },
-  { value: 1, icon: '🔥', name: 'Medium' },
-  { value: 0, icon: '', name: 'Normal' },
-  { value: -1, icon: '🧊', name: 'Someday' },
+  { value: 3, name: 'Critical', css: 'critical' },
+  { value: 2, name: 'Highest', css: 'highest' },
+  { value: 1, name: 'High', css: 'high' },
+  { value: 0, name: 'Medium', css: 'medium' },
+  { value: -1, name: 'Low', css: 'low' },
+  { value: -2, name: 'Lowest', css: 'lowest' },
 ];
-export const prioIcon = (p) => PRIORITIES.find((x) => x.value === p)?.icon ?? '';
+
+/** CSS class suffix for a priority: rows, cards and chips get "prio-critical", "prio-high", … */
+export const prioClass = (p) => PRIORITIES.find((x) => x.value === p)?.css ?? 'medium';
+
+const chevrons = (ys, dir) => ys.map((y) => (dir === 'up'
+  ? `<path d="M3 ${y + 4}L8 ${y}L13 ${y + 4}"/>`
+  : `<path d="M3 ${y}L8 ${y + 4}L13 ${y}"/>`)).join('');
+const PRIO_SHAPES = {
+  critical: '<path class="star" d="M8 1.2l2.1 4.3 4.7.7-3.4 3.3.8 4.7L8 11.9l-4.2 2.3.8-4.7L1.2 6.2l4.7-.7z"/>',
+  highest: chevrons([3.5, 7.5], 'up'),
+  high: chevrons([5.5], 'up'),
+  medium: '<path d="M3 6H13"/><path d="M3 10H13"/>', // "=" sign, not an arrow
+  low: chevrons([5.5], 'down'),
+  lowest: chevrons([3.5, 7.5], 'down'),
+};
+
+/** Jira-style priority icon: ★ Critical, ⌃⌃ Highest, ⌃ High, = Medium, ⌄ Low, ⌄⌄ Lowest. The name is in the tooltip. */
+export function prioIcon(p) {
+  const css = prioClass(p);
+  const label = `Priority: ${prioName(p)}`;
+  return `<span class="prio-icon ${css}" title="${label}" role="img" aria-label="${label}">` +
+    `<svg width="16" height="16" viewBox="0 0 16 16">${PRIO_SHAPES[css]}</svg></span>`;
+}
 export const prioName = (p) => PRIORITIES.find((x) => x.value === p)?.name ?? String(p);
 
 export const STATUSES = [

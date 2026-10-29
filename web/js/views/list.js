@@ -2,7 +2,7 @@
 import { store, taskById, childrenOf, sprintById, projectById, projectList, projectLabel, projectColor, byPriority, byDue, updateTask } from '../store.js';
 import { openTaskEditor } from '../editor.js';
 import { projectChip, metaBadges } from '../components.js';
-import { esc, prioIcon, statusName, empty } from '../util.js';
+import { esc, prioIcon, prioClass, statusName, empty } from '../util.js';
 
 const KEY = 'gtd.list';
 const state = { sort: 'priority', group: 'project', showDone: false, collapsed: [], ...JSON.parse(localStorage.getItem(KEY) || '{}'), q: '' };
@@ -135,10 +135,10 @@ function tree(t, depth) {
 function row(t, depth, { flat = false, hasKids = false, collapsed = false } = {}) {
   const parent = flat && t.parent_id != null ? taskById(t.parent_id) : null;
   const sprint = t.sprint_id != null && state.group !== 'sprint' ? sprintById(t.sprint_id) : null;
-  return `<div class="row st-${t.status}" data-id="${t.id}" style="--depth:${depth}">
+  return `<div class="row st-${t.status} prio-${prioClass(t.priority)}" data-id="${t.id}" style="--depth:${depth}">
     <span class="caret">${hasKids ? (collapsed ? '▸' : '▾') : ''}</span>
     <input type="checkbox" class="done-toggle" ${t.status === 'done' ? 'checked' : ''} title="Done">
-    <span class="prio">${prioIcon(t.priority)}</span>
+    ${prioIcon(t.priority)}
     <span class="title">${esc(t.title)}${parent ? ` <span class="muted">← ${esc(parent.title)}</span>` : ''}</span>
     ${t.status === 'doing' ? '<span class="badge doing">in progress</span>' : ''}
     <span class="meta">

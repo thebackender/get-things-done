@@ -12,6 +12,8 @@
   --critical: #d03b3b;
   --warning: #fab219;
   --good: #0ca30c;
+  --high: #ec835a;
+  --medium: #fab219;
   --radius: 8px;
   --shadow: 0 1px 2px rgba(11, 11, 11, 0.06), 0 2px 8px rgba(11, 11, 11, 0.04);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
@@ -120,7 +122,48 @@ main { padding: 16px; max-width: 1400px; margin: 0 auto; }
 .group .row:first-of-type { border-top-left-radius: var(--radius); border-top-right-radius: var(--radius); }
 .row:hover { background: #f6f6f3; }
 .row .caret { width: 14px; color: var(--muted); text-align: center; flex: none; }
-.row .prio { min-width: 0; flex: none; font-size: 12px; }
+/* Priority: Jira-style icon before the title; the top three levels also color the whole row or card. */
+.prio-icon { display: inline-flex; flex: none; width: 16px; height: 16px; vertical-align: -3px; }
+.prio-icon path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.prio-icon path.star { fill: currentColor; stroke-width: 1; }
+.prio-icon.critical { color: var(--critical); }
+.prio-icon.highest { color: #e34948; }
+.prio-icon.high { color: #e0692f; }
+.prio-icon.medium { color: #c9a227; }
+.prio-icon.low { color: #2a78d6; }
+.prio-icon.lowest { color: #6da7ec; }
+
+.row.prio-critical { background: #fdeded; box-shadow: inset 5px 0 0 var(--critical); }
+.row.prio-critical:hover { background: #fbe2e2; }
+.row.prio-critical .title { font-weight: 700; }
+.row.prio-highest { background: #fff2ee; box-shadow: inset 5px 0 0 #e34948; }
+.row.prio-highest:hover { background: #ffe7e0; }
+.row.prio-highest .title { font-weight: 600; }
+.row.prio-high { box-shadow: inset 5px 0 0 #ec835a; }
+.row.prio-lowest .title { color: var(--muted); }
+
+.card.prio-critical { border-left: 5px solid var(--critical); background: #fff6f6; }
+.card.prio-critical .card-title { font-weight: 700; }
+.card.prio-highest { border-left: 5px solid #e34948; background: #fffaf8; }
+.card.prio-highest .card-title { font-weight: 600; }
+.card.prio-high { border-left: 5px solid #ec835a; }
+.card.prio-lowest .card-title { color: var(--muted); }
+
+/* Done tasks stop shouting. */
+.row.st-done, .row.st-done:hover { background: var(--card); box-shadow: none; }
+.row.st-done .title, .card.st-done .card-title { font-weight: normal; }
+.card.st-done { border-left-width: 1px; border-left-color: var(--line); background: var(--card); }
+.st-done .prio-icon { color: var(--line-strong); }
+
+.cal-task .prio-icon { width: 13px; height: 13px; margin-right: 3px; vertical-align: -2px; }
+.cal-task .prio-icon svg { width: 13px; height: 13px; }
+.cal-task.prio-critical { background: #fdeded; color: #9b1c1c; font-weight: 700; }
+.cal-task.prio-highest { background: #fff2ee; font-weight: 600; }
+.cal-task.st-done.prio-critical, .cal-task.st-done.prio-highest { background: #f4f4f1; color: inherit; font-weight: normal; }
+.node.prio-critical circle:not(.hit) { stroke: var(--critical); stroke-width: 3; }
+
+.with-icon { display: flex; align-items: center; gap: 8px; }
+.with-icon select { flex: 1; min-width: 0; }
 .row .title { flex: 1; min-width: 120px; }
 .row .meta { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
 .st-done .title, .st-done .card-title, .st-done > a { text-decoration: line-through; color: var(--muted); }
@@ -303,7 +346,9 @@ dialog { overflow: auto; }
 .editor header h2 { flex: 1; }
 .editor label:not(.check) { display: flex; flex-direction: column; gap: 4px; color: var(--ink-2); font-size: 13px; }
 .editor label input, .editor label select { color: var(--ink); font-size: 14px; }
-.editor .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.editor .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.editor .grid > * { min-width: 0; }
+.editor select { width: 100%; min-width: 0; text-overflow: ellipsis; }
 .title-input { font-size: 17px !important; padding: 8px 10px; }
 .editor details { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; }
 .editor summary { cursor: pointer; color: var(--ink-2); }

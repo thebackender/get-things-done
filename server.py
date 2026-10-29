@@ -311,8 +311,8 @@ def clean_task(payload):
                 raise ApiError(f"Unknown status: {value}")
         elif key == "priority":
             value = as_int(value, "priority")
-            if not -1 <= value <= 3:
-                raise ApiError("Priority must be between -1 and 3")
+            if not -2 <= value <= 3:
+                raise ApiError("Priority must be between -2 (lowest) and 3 (critical)")
         elif key in ("parent_id", "sprint_id", "project_id"):
             value = as_int_or_none(value, key)
         elif key == "due":

@@ -178,7 +178,7 @@ function byPriority() {
   const open = store.tasks.filter((t) => t.status !== 'done');
   const data = PRIORITIES.map((p) => {
     const n = open.filter((t) => t.priority === p.value).length;
-    return { label: p.icon || 'normal', value: n, tip: `${p.name}: ${n}` };
+    return { label: p.name, value: n, tip: `${p.name}: ${n}` };
   });
   return statCard('Open by priority',
     columnChart(data, { aria: 'Open tasks by priority' }) +

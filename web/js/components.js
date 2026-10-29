@@ -1,7 +1,7 @@
 // Shared markup and behavior: task card, badges, drag and drop.
 import { taskById, childrenOf, blockers, isOverdue, goalSum, projectColor, projectLabel, addProgress } from './store.js';
 import { openTaskEditor } from './editor.js';
-import { esc, fmtDate, fmtNum, prioIcon, trunc, toast } from './util.js';
+import { esc, fmtDate, fmtNum, prioIcon, prioClass, trunc, toast } from './util.js';
 
 /** "Project" or "Project:Subproject" with the project's color dot. */
 export function projectChip(id) {
@@ -50,8 +50,8 @@ export function card(t, { depth = 0, showParent = true } = {}) {
   const parent = showParent && t.parent_id != null ? taskById(t.parent_id) : null;
   const progressBtn = t.target != null && t.status !== 'done'
     ? `<button class="icon add-progress" data-progress="${t.id}" title="Add progress">+</button>` : '';
-  return `<div class="card st-${t.status}" data-id="${t.id}" draggable="true" style="--depth:${depth}">
-    <div class="card-top"><span class="prio">${prioIcon(t.priority)}</span><span class="card-title">${esc(t.title)}</span>${progressBtn}</div>
+  return `<div class="card st-${t.status} prio-${prioClass(t.priority)}" data-id="${t.id}" draggable="true" style="--depth:${depth}">
+    <div class="card-top">${prioIcon(t.priority)}<span class="card-title">${esc(t.title)}</span>${progressBtn}</div>
     ${parent ? `<div class="card-parent">↳ ${esc(parent.title)}</div>` : ''}
     <div class="card-meta">${projectChip(t.project_id)}${metaBadges(t)}</div>
   </div>`;

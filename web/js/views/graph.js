@@ -145,7 +145,7 @@ export function render(view) {
   nodesLayer.innerHTML = nodes.map((t) => {
     const p = pos.get(t.id);
     const r = radius(t);
-    return `<g class="node st-${t.status}" data-id="${t.id}" transform="translate(${p.x},${p.y})">
+    return `<g class="node st-${t.status}${t.priority >= 3 ? ' prio-critical' : ''}" data-id="${t.id}" transform="translate(${p.x},${p.y})">
       <circle r="${r + 8}" class="hit"/>
       <circle r="${r}" fill="${projectColor(t.project_id)}" class="${t.status === 'waiting' ? 'ring-waiting' : ''}"/>
       <text y="${r + 14}">${esc(trunc(t.title, 30))}</text>
