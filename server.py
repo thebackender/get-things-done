@@ -37,8 +37,7 @@ TASK_DEFAULTS = {
     "parent_id": None,
     "status": "todo",
     "priority": 0,
-    "category": "",
-    "tags": [],
+    "project_id": None,
     "due": None,
     "depends_on": [],
     "sprint_id": None,
@@ -51,6 +50,11 @@ TASK_DEFAULTS = {
     "done_at": None,
 }
 SPRINT_DEFAULTS = {"name": "", "start": None, "end": None, "goal": "", "status": "planned"}
+PROJECT_DEFAULTS = {"name": "", "parent_id": None, "color": "#9a9893", "is_active": True}
+
+# Categorical palette (same as the UI). New top-level projects take the first unused color.
+PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
+OTHER_COLOR = "#9a9893"
 
 lock = threading.Lock()
 undo_stack = []
@@ -73,7 +77,7 @@ def now():
 # ---------- storage ----------
 
 def empty_state():
-    return {"tasks": [], "sprints": [], "history": []}
+    return {"tasks": [], "sprints": [], "projects": [], "history": []}
 
 
 def load():
@@ -84,7 +88,8 @@ def load():
             data = json.load(f)
     except json.JSONDecodeError as e:
         raise ApiError(f"{DATA_FILE.name} is corrupted: {e}. Backups are in data/backups/", 500)
-    for key in ("tasks", "sprints", "history"):
+    migrate_categories(data)
+    for key in ("tasks", "sprints", "projects", "history"):
         data.setdefault(key, [])
     # The file may have been edited by hand: fill in missing fields.
     for task in data["tasks"]:
@@ -93,7 +98,37 @@ def load():
     for sprint in data["sprints"]:
         for key, value in SPRINT_DEFAULTS.items():
             sprint.setdefault(key, value)
+    for project in data["projects"]:
+        for key, value in PROJECT_DEFAULTS.items():
+            project.setdefault(key, value)
     return data
+
+
+def next_color(projects):
+    used = {p["color"].lower() for p in projects if p["parent_id"] is None}
+    return next((color for color in PALETTE if color not in used), OTHER_COLOR)
+
+
+def migrate_categories(data):
+    """Older files had free-text categories and tags. Categories become top-level projects; tags are dropped."""
+    if "projects" in data:
+        return
+    projects = []
+    for category in data.get("categories", []):
+        projects.append({"id": len(projects) + 1, "name": category["name"], "parent_id": None,
+                         "color": category.get("color", OTHER_COLOR), "is_active": True})
+    by_name = {p["name"]: p["id"] for p in projects}
+    for task in data.get("tasks", []):
+        name = task.pop("category", "") or ""
+        task.pop("tags", None)
+        if name and name not in by_name:
+            projects.append({"id": len(projects) + 1, "name": name, "parent_id": None,
+                             "color": next_color(projects), "is_active": True})
+            by_name[name] = projects[-1]["id"]
+        task["project_id"] = by_name.get(name)
+    data["projects"] = projects
+    data.pop("categories", None)
+    data.pop("tags", None)
 
 
 def backup_daily():
@@ -242,7 +277,7 @@ def clean_task(payload):
             value = as_str(value).strip()
             if not value:
                 raise ApiError("Title cannot be empty")
-        elif key in ("category", "unit", "waiting_for"):
+        elif key in ("unit", "waiting_for"):
             value = as_str(value).strip()
         elif key == "notes":
             value = as_str(value)
@@ -253,12 +288,10 @@ def clean_task(payload):
             value = as_int(value, "priority")
             if not -1 <= value <= 3:
                 raise ApiError("Priority must be between -1 and 3")
-        elif key in ("parent_id", "sprint_id"):
+        elif key in ("parent_id", "sprint_id", "project_id"):
             value = as_int_or_none(value, key)
         elif key == "due":
             value = as_date(value, "due")
-        elif key == "tags":
-            value = as_str_list(value)
         elif key == "depends_on":
             value = as_int_list(value, "depends_on")
         elif key == "target":
@@ -346,6 +379,8 @@ def check_task_refs(data, task):
         raise ApiError("Dependencies form a cycle: the tasks would wait for each other forever")
     if task["sprint_id"] is not None:
         find(data["sprints"], task["sprint_id"], "Sprint")
+    if task["project_id"] is not None:
+        find(data["projects"], task["project_id"], "Project")
 
 
 def goal_sum(task):
@@ -493,6 +528,108 @@ def delete_sprint(data, sprint_id):
     return {"ok": True, "moved_to_backlog": moved}
 
 
+# ---------- projects ----------
+# Projects have one optional level of subprojects. Shown as "Project" or "Project:Subproject".
+# is_active controls whether a project shows up in the task editor's dropdown.
+
+def clean_color(value):
+    color = as_str(value).strip().lower()
+    if not re.fullmatch(r"#[0-9a-f]{6}", color):
+        raise ApiError("Color must look like #1a2b3c")
+    return color
+
+
+def clean_project_name(value):
+    name = as_str(value).strip()
+    if not name:
+        raise ApiError("Project name cannot be empty")
+    if ":" in name:
+        raise ApiError('Project name cannot contain ":" (it separates project and subproject)')
+    return name
+
+
+def sibling_named(data, name, parent_id, exclude=None):
+    return next((p for p in data["projects"]
+                 if p["name"] == name and p["parent_id"] == parent_id and p is not exclude), None)
+
+
+def check_parent(data, parent_id, project=None):
+    if parent_id is None:
+        return
+    parent = find(data["projects"], parent_id, "Project")
+    if parent["parent_id"] is not None:
+        raise ApiError("Subprojects can only go one level deep")
+    if project is not None:
+        if parent is project:
+            raise ApiError("A project cannot be its own parent")
+        if any(p["parent_id"] == project["id"] for p in data["projects"]):
+            raise ApiError("This project has subprojects, so it cannot become a subproject itself")
+
+
+def new_project(data, name, parent_id, color=None, is_active=True):
+    project = {"id": next_id(data["projects"]), "name": name, "parent_id": parent_id,
+               "color": color or (OTHER_COLOR if parent_id else next_color(data["projects"])),
+               "is_active": is_active}
+    data["projects"].append(project)
+    return project
+
+
+def create_project(data, body):
+    """Two forms:
+    {name, parent_id?, color?, is_active?} creates exactly that project (error if the name is taken);
+    {path: "Project" or "Project:Subproject"} finds or creates each part (used by the task editor)."""
+    if "path" in body:
+        parts = [part.strip() for part in as_str(body["path"]).split(":")]
+        if len(parts) > 2:
+            raise ApiError('Use "Project" or "Project:Subproject" (one level of subprojects)')
+        names = [clean_project_name(part) for part in parts]
+        root = sibling_named(data, names[0], None) or new_project(data, names[0], None)
+        root["is_active"] = True
+        if len(names) == 1:
+            return {"item": root}
+        sub = sibling_named(data, names[1], root["id"]) or new_project(data, names[1], root["id"])
+        sub["is_active"] = True
+        return {"item": sub}
+
+    name = clean_project_name(body.get("name"))
+    parent_id = as_int_or_none(body.get("parent_id"), "parent_id")
+    check_parent(data, parent_id)
+    if sibling_named(data, name, parent_id):
+        raise ApiError(f'Project "{name}" already exists here')
+    color = clean_color(body["color"]) if body.get("color") else None
+    return {"item": new_project(data, name, parent_id, color, bool(body.get("is_active", True)))}
+
+
+def update_project(data, project_id, body):
+    project = find(data["projects"], project_id, "Project")
+    if "parent_id" in body:
+        parent_id = as_int_or_none(body["parent_id"], "parent_id")
+        check_parent(data, parent_id, project)
+        project["parent_id"] = parent_id
+    if "name" in body:
+        project["name"] = clean_project_name(body["name"])
+    if sibling_named(data, project["name"], project["parent_id"], exclude=project):
+        raise ApiError(f'Project "{project["name"]}" already exists here')
+    if "color" in body:
+        project["color"] = clean_color(body["color"])
+    if "is_active" in body:
+        project["is_active"] = bool(body["is_active"])
+    return {"item": project}
+
+
+def delete_project(data, project_id):
+    """Deletes the project and its subprojects; their tasks stay, just without a project."""
+    find(data["projects"], project_id, "Project")
+    removed = {project_id} | {p["id"] for p in data["projects"] if p["parent_id"] == project_id}
+    data["projects"] = [p for p in data["projects"] if p["id"] not in removed]
+    cleared = 0
+    for task in data["tasks"]:
+        if task["project_id"] in removed:
+            task["project_id"] = None
+            cleared += 1
+    return {"ok": True, "deleted": len(removed), "cleared": cleared}
+
+
 # ---------- HTTP ----------
 
 ROUTES = [
@@ -506,6 +643,9 @@ ROUTES = [
     ("POST", r"/api/sprints", lambda body, i: mutate(create_sprint, body)),
     ("PUT", r"/api/sprints/(\d+)", lambda body, i: mutate(update_sprint, i, body)),
     ("DELETE", r"/api/sprints/(\d+)", lambda body, i: mutate(delete_sprint, i)),
+    ("POST", r"/api/projects", lambda body, i: mutate(create_project, body)),
+    ("PUT", r"/api/projects/(\d+)", lambda body, i: mutate(update_project, i, body)),
+    ("DELETE", r"/api/projects/(\d+)", lambda body, i: mutate(delete_project, i)),
 ]
 
 

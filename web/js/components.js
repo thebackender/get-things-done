@@ -1,10 +1,13 @@
 // Shared markup and behavior: task card, badges, drag and drop.
-import { taskById, childrenOf, blockers, isOverdue, goalSum, categoryColor, addProgress } from './store.js';
+import { taskById, childrenOf, blockers, isOverdue, goalSum, projectColor, projectLabel, addProgress } from './store.js';
 import { openTaskEditor } from './editor.js';
 import { esc, fmtDate, fmtNum, prioIcon, trunc, toast } from './util.js';
 
-export const catChip = (cat) =>
-  cat ? `<span class="chip"><i class="dot" style="--c:${categoryColor(cat)}"></i>${esc(cat)}</span>` : '';
+/** "Project" or "Project:Subproject" with the project's color dot. */
+export function projectChip(id) {
+  const label = projectLabel(id);
+  return label ? `<span class="chip" title="Project"><i class="dot" style="--c:${projectColor(id)}"></i>${esc(label)}</span>` : '';
+}
 
 export function goalBar(t) {
   const sum = goalSum(t);
@@ -18,7 +21,7 @@ export function progressBar(done, total) {
   return `<span class="track wide"><span class="fill" style="width:${pct}%"></span></span>`;
 }
 
-/** Task status badges: subtasks, goal, waiting, blocked, due date, tags. */
+/** Task status badges: subtasks, goal, waiting, blocked, due date. */
 export function metaBadges(t) {
   const parts = [];
   const kids = childrenOf(t.id);
@@ -40,7 +43,6 @@ export function metaBadges(t) {
     const overdue = isOverdue(t);
     parts.push(`<span class="badge due${overdue ? ' overdue' : ''}" title="${overdue ? 'Overdue' : 'Due date'}">${overdue ? '⚠' : '📅'} ${fmtDate(t.due)}</span>`);
   }
-  for (const tag of t.tags) parts.push(`<span class="tag">#${esc(tag)}</span>`);
   return parts.join('');
 }
 
@@ -51,7 +53,7 @@ export function card(t, { depth = 0, showParent = true } = {}) {
   return `<div class="card st-${t.status}" data-id="${t.id}" draggable="true" style="--depth:${depth}">
     <div class="card-top"><span class="prio">${prioIcon(t.priority)}</span><span class="card-title">${esc(t.title)}</span>${progressBtn}</div>
     ${parent ? `<div class="card-parent">↳ ${esc(parent.title)}</div>` : ''}
-    <div class="card-meta">${catChip(t.category)}${metaBadges(t)}</div>
+    <div class="card-meta">${projectChip(t.project_id)}${metaBadges(t)}</div>
   </div>`;
 }
 

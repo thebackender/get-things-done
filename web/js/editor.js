@@ -1,6 +1,6 @@
 // Modal dialogs: task editor and sprint editor (one shared <dialog>).
 import {
-  store, taskById, childrenOf, descendants, categories, sprintById, sprintOrder,
+  store, taskById, childrenOf, descendants, projectList, projectLabel, isSelectable, createProject, sprintById, sprintOrder,
   createTask, updateTask, deleteTask, createSprint, updateSprint, deleteSprint,
 } from './store.js';
 import {
@@ -14,9 +14,11 @@ const dlg = document.getElementById('dialog');
 dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
 
 const NEW_TASK = {
-  title: '', parent_id: null, status: 'todo', priority: 0, category: '', tags: [], due: null,
+  title: '', parent_id: null, status: 'todo', priority: 0, project_id: null, due: null,
   depends_on: [], sprint_id: null, notes: '', waiting_for: '', target: null, unit: '', progress: [],
 };
+
+const NEW_PROJECT = '__new__';
 
 const FIELD_NAMES = {
   status: 'status', sprint_id: 'sprint', priority: 'priority', due: 'due', progress: 'progress',
@@ -59,6 +61,8 @@ export function openTaskEditor(task = null, preset = {}) {
   const kids = isNew ? [] : childrenOf(t.id);
   const history = isNew ? [] : store.history.filter((h) => h.task_id === t.id).slice(-10).reverse();
   const isGoal = t.target != null;
+  // Inactive projects are hidden from the dropdown, except the one this task already uses.
+  const projects = projectList().filter((p) => isSelectable(p) || p.id === t.project_id);
 
   dlg.innerHTML = `
   <form class="editor" novalidate>
@@ -70,14 +74,23 @@ export function openTaskEditor(task = null, preset = {}) {
     <div class="grid">
       <label>Status<select name="status">${STATUSES.map((s) => opt(s.value, s.name, t.status)).join('')}</select></label>
       <label>Priority<select name="priority">${PRIORITIES.map((p) => opt(p.value, `${p.icon} ${p.name}`.trim(), t.priority)).join('')}</select></label>
-      <label>Category<input name="category" list="category-list" value="${esc(t.category)}" autocomplete="off" placeholder="Health, Shopping…">
-        <datalist id="category-list">${categories().map((c) => `<option value="${esc(c)}">`).join('')}</datalist></label>
+      <div class="field">Project
+        <select name="project_id">
+          <option value="">— none —</option>
+          ${projects.map((p) => opt(p.id, projectLabel(p.id) + (isSelectable(p) ? '' : ' (inactive)'), t.project_id)).join('')}
+          <option value="${NEW_PROJECT}">+ New project…</option>
+        </select>
+        <span class="inline-new" hidden>
+          <input class="new-project" placeholder="Project or Project:Subproject" autocomplete="off">
+          <button type="button" data-act="add-project">Add</button>
+          <button type="button" class="icon" data-act="cancel-project" title="Cancel">✕</button>
+        </span>
+      </div>
       <label>Due date${dateInput('due', t.due)}</label>
       <label>Parent<select name="parent_id"><option value="">— none —</option>${parents.map((p) => opt(p.id, p.title, t.parent_id)).join('')}</select></label>
       <label>Sprint<select name="sprint_id"><option value="">Backlog</option>${sprints.map((s) => opt(s.id, s.name + (s.status === 'active' ? ' (active)' : ''), t.sprint_id)).join('')}</select></label>
     </div>
     <label class="waiting-row" ${t.status === 'waiting' ? '' : 'hidden'}>Waiting for<input name="waiting_for" value="${esc(t.waiting_for)}" placeholder="e.g. reply from the visa office"></label>
-    <label>Tags<input name="tags" value="${esc(t.tags.join(', '))}" placeholder="comma-separated"></label>
     <label>Notes<textarea name="notes" rows="4">${esc(t.notes)}</textarea></label>
 
     <fieldset class="goal">
@@ -140,6 +153,25 @@ export function openTaskEditor(task = null, preset = {}) {
   }
   renderProgress();
 
+  // ---- project: dropdown with inline "new project" ("Project" or "Project:Subproject") ----
+  const projectSelect = el.project_id;
+  const newProjectRow = form.querySelector('.inline-new');
+  const newProjectInput = form.querySelector('.new-project');
+  let lastProject = projectSelect.value;
+  async function addProject() {
+    const path = newProjectInput.value.trim();
+    if (!path) return newProjectInput.focus();
+    const res = await createProject({ path }); // finds or creates; the store is reloaded when it returns
+    if (!res) return; // the error was already shown
+    const id = String(res.item.id);
+    if (![...projectSelect.options].some((o) => o.value === id)) {
+      projectSelect.querySelector(`option[value="${NEW_PROJECT}"]`).before(new Option(projectLabel(res.item.id), id));
+    }
+    projectSelect.value = lastProject = id;
+    newProjectInput.value = '';
+    newProjectRow.hidden = true;
+  }
+
   form.onsubmit = async (e) => {
     e.preventDefault();
     const title = el.title.value.trim();
@@ -148,6 +180,8 @@ export function openTaskEditor(task = null, preset = {}) {
       el.title.focus();
       return;
     }
+    // A new project typed in but not added yet still counts.
+    if (!newProjectRow.hidden && newProjectInput.value.trim()) await addProject();
     const due = readDate(el.due, 'Due date');
     if (due === undefined) return;
     const goal = el.is_goal.checked;
@@ -161,11 +195,10 @@ export function openTaskEditor(task = null, preset = {}) {
       title,
       status: el.status.value,
       priority: Number(el.priority.value),
-      category: el.category.value.trim(),
+      project_id: projectSelect.value && projectSelect.value !== NEW_PROJECT ? Number(projectSelect.value) : null,
       due,
       parent_id: el.parent_id.value ? Number(el.parent_id.value) : null,
       sprint_id: el.sprint_id.value ? Number(el.sprint_id.value) : null,
-      tags: el.tags.value.split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean),
       notes: el.notes.value,
       waiting_for: el.waiting_for.value.trim(),
       depends_on: [...form.querySelectorAll('input[name=depends_on]:checked')].map((c) => Number(c.value)),
@@ -186,7 +219,9 @@ export function openTaskEditor(task = null, preset = {}) {
     }
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'close') dlg.close();
-    if (act === 'add-sub') openTaskEditor(null, { parent_id: t.id, category: t.category, sprint_id: t.sprint_id });
+    if (act === 'add-project') addProject();
+    if (act === 'cancel-project') newProjectRow.hidden = true;
+    if (act === 'add-sub') openTaskEditor(null, { parent_id: t.id, project_id: t.project_id, sprint_id: t.sprint_id });
     if (act === 'delete') {
       const n = descendants(t.id).length;
       if (confirm(`Delete "${t.title}"${n ? ` and its ${n} subtask(s)` : ''}?`)) {
@@ -219,18 +254,27 @@ export function openTaskEditor(task = null, preset = {}) {
 
   form.onchange = (e) => {
     if (e.target.name === 'status') form.querySelector('.waiting-row').hidden = e.target.value !== 'waiting';
+    if (e.target === projectSelect) {
+      if (projectSelect.value === NEW_PROJECT) {
+        projectSelect.value = lastProject;
+        newProjectRow.hidden = false;
+        newProjectInput.focus();
+      } else lastProject = projectSelect.value;
+    }
     if (e.target.name === 'is_goal') form.querySelector('.goal-body').hidden = !e.target.checked;
     if (e.target.name === 'depends_on') {
       form.querySelector('.dep-count').textContent = form.querySelectorAll('input[name=depends_on]:checked').length;
     }
   };
 
-  // Enter in the progress field adds an entry instead of submitting the form.
+  // Enter in the progress and new project boxes adds an item instead of submitting the form.
   form.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && e.target.classList.contains('pv')) {
-      e.preventDefault();
-      form.querySelector('[data-act=add-progress]').click();
-    }
+    if (e.key !== 'Enter') return;
+    const cls = e.target.classList;
+    if (cls.contains('pv')) form.querySelector('[data-act=add-progress]').click();
+    else if (cls.contains('new-project')) addProject();
+    else return;
+    e.preventDefault();
   });
 
   if (!dlg.open) dlg.showModal();

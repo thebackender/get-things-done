@@ -1,20 +1,22 @@
 // App state: data from the server, lookup indexes, and all changes via the API.
 import * as api from './api.js';
-import { PALETTE, OTHER_COLOR, today, toast } from './util.js';
+import { OTHER_COLOR, today, toast } from './util.js';
 
-export const store = { tasks: [], sprints: [], history: [], canUndo: false };
+export const store = { tasks: [], sprints: [], projects: [], history: [], canUndo: false };
 
 const listeners = new Set();
 export const subscribe = (fn) => listeners.add(fn);
 
 let byId = new Map();
 let kids = new Map();
-let cats = [];
+let projectsById = new Map();
+let projectOrder = [];
 
 export async function reload() {
   const state = await api.getState();
   store.tasks = state.tasks;
   store.sprints = state.sprints;
+  store.projects = state.projects;
   store.history = state.history;
   store.canUndo = state.can_undo;
   byId = new Map(store.tasks.map((t) => [t.id, t]));
@@ -24,7 +26,11 @@ export async function reload() {
     if (!kids.has(t.parent_id)) kids.set(t.parent_id, []);
     kids.get(t.parent_id).push(t);
   }
-  cats = [...new Set(store.tasks.map((t) => t.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'));
+  projectsById = new Map(store.projects.map((p) => [p.id, p]));
+  // Each top-level project (by name), directly followed by its subprojects (by name).
+  const byName = (a, b) => a.name.localeCompare(b.name, 'ru');
+  const roots = store.projects.filter((p) => p.parent_id == null || !projectsById.has(p.parent_id)).sort(byName);
+  projectOrder = roots.flatMap((r) => [r, ...store.projects.filter((p) => p.parent_id === r.id).sort(byName)]);
   listeners.forEach((fn) => fn());
 }
 
@@ -54,10 +60,25 @@ export const blockers = (t) => t.depends_on.map(taskById).filter((d) => d && d.s
 export const isOverdue = (t) => t.status !== 'done' && !!t.due && t.due < today();
 export const goalSum = (t) => t.progress.reduce((s, p) => s + Number(p.value || 0), 0);
 
-export const categories = () => cats;
-export function categoryColor(cat) {
-  const i = cats.indexOf(cat);
-  return i >= 0 && i < PALETTE.length ? PALETTE[i] : OTHER_COLOR;
+// ---------- projects ----------
+
+export const projectById = (id) => projectsById.get(id);
+/** All projects in display order: each project followed by its subprojects. */
+export const projectList = () => projectOrder;
+const rootOf = (p) => (p && p.parent_id != null ? projectsById.get(p.parent_id) ?? p : p);
+/** "Project" or "Project:Subproject"; empty for no project. */
+export function projectLabel(id) {
+  const p = projectsById.get(id);
+  if (!p) return '';
+  const root = rootOf(p);
+  return root === p ? p.name : `${root.name}:${p.name}`;
+}
+/** Subprojects use their top-level project's color. */
+export const projectColor = (id) => rootOf(projectsById.get(id))?.color ?? OTHER_COLOR;
+/** Shown in the task editor dropdown: active, and for subprojects the parent is active too. */
+export function isSelectable(p) {
+  const root = rootOf(p);
+  return p.is_active && root.is_active;
 }
 
 const dueKey = (t) => t.due || '9999';
@@ -96,6 +117,12 @@ export const createSprint = (data) => run(api.post('/api/sprints', data));
 export const updateSprint = (id, data) =>
   run(api.put(`/api/sprints/${id}`, data), (r) => (r.moved_to_backlog ? `${r.moved_to_backlog} task(s) moved back to the backlog` : null));
 export const deleteSprint = (id) => run(api.del(`/api/sprints/${id}`), 'Sprint deleted');
+
+/** Create a project. {path: "A" or "A:B"} finds or creates; {name, parent_id} creates exactly that. */
+export const createProject = (body) => run(api.post('/api/projects', body));
+export const updateProject = (id, data) => run(api.put(`/api/projects/${id}`, data));
+export const deleteProject = (id) =>
+  run(api.del(`/api/projects/${id}`), (r) => `Project deleted${r.cleared ? `, removed from ${r.cleared} task(s)` : ''}`);
 
 export async function undo() {
   if (!store.canUndo) return toast('Nothing to undo');

@@ -1,5 +1,5 @@
 // Stats tab: summary tiles and SVG charts.
-import { store, activeSprint, sprintOrder, isOverdue, goalSum, categories, categoryColor } from '../store.js';
+import { store, activeSprint, sprintOrder, isOverdue, goalSum, projectById, projectList, projectLabel } from '../store.js';
 import { PALETTE, OTHER_COLOR, PRIORITIES, esc, trunc, today, addDays, weekStart, fmtDate, fmtNum, daysBetween, freshBox, empty } from '../util.js';
 
 // Charts are drawn at the card's actual width so text never gets stretched.
@@ -78,7 +78,7 @@ function columnChart(data, { color = BLUE, height = 190, aria }) {
 /** Stacked horizontal bars. rows: [{label, values: [..]}], series: [{name, color}] */
 function stackedBars(rows, series, aria) {
   return slot((W) => {
-    const labelW = 140, padR = 56, rowH = 28, barH = 14, gap = 2;
+    const labelW = 180, padR = 56, rowH = 28, barH = 14, gap = 2;
     const height = rows.length * rowH + 8;
     const iw = W - labelW - padR;
     const max = Math.max(1, ...rows.map((r) => r.values.reduce((a, b) => a + b, 0)));
@@ -95,7 +95,7 @@ function stackedBars(rows, series, aria) {
         return path;
       }).join('');
       const tip = `${r.label}: ${series.map((s, j) => `${s.name.toLowerCase()} ${r.values[j]}`).join(', ')}`;
-      return `<text class="label" x="${labelW - 8}" y="${y + rowH / 2 + 4}" text-anchor="end">${esc(trunc(r.label, 20))}</text>
+      return `<text class="label" x="${labelW - 8}" y="${y + rowH / 2 + 4}" text-anchor="end">${esc(trunc(r.label, 26))}</text>
         ${segs}<text class="value" x="${x + 4}" y="${y + rowH / 2 + 4}">${total}</text>
         <rect class="hit" x="0" y="${y}" width="${W}" height="${rowH}" data-tip="${esc(tip)}"/>`;
     }).join('');
@@ -162,17 +162,16 @@ function weeklyDone() {
     tableView(['Week of', 'Done'], data.map((d) => [d.label, d.value])));
 }
 
-function byCategory() {
+function byProject() {
   const series = [{ name: 'Done', color: BLUE }, { name: 'Open', color: ORANGE }];
-  const names = [...categories(), ''];
-  const rows = names.map((c) => {
-    const list = store.tasks.filter((t) => t.category === c);
-    return { label: c || 'No category', values: [list.filter((t) => t.status === 'done').length, list.filter((t) => t.status !== 'done').length] };
-  }).filter((r) => r.values[0] + r.values[1] > 0);
-  if (!rows.length) return statCard('By category', empty('No tasks'));
-  return statCard('By category',
-    legend(series) + stackedBars(rows, series, 'Tasks by category') +
-    tableView(['Category', 'Done', 'Open'], rows.map((r) => [r.label, ...r.values])));
+  const count = (list) => [list.filter((t) => t.status === 'done').length, list.filter((t) => t.status !== 'done').length];
+  const rows = projectList().map((p) => ({ label: projectLabel(p.id), values: count(store.tasks.filter((t) => t.project_id === p.id)) }));
+  rows.push({ label: 'No project', values: count(store.tasks.filter((t) => !projectById(t.project_id))) });
+  const shown = rows.filter((r) => r.values[0] + r.values[1] > 0);
+  if (!shown.length) return statCard('By project', empty('No tasks'));
+  return statCard('By project',
+    legend(series) + stackedBars(shown, series, 'Tasks by project') +
+    tableView(['Project', 'Done', 'Open'], shown.map((r) => [r.label, ...r.values])));
 }
 
 function byPriority() {
@@ -279,7 +278,7 @@ export function render(view) {
     return;
   }
   root.innerHTML = `${tiles()}
-    <div class="stats-grid">${weeklyDone()}${burndown()}${byCategory()}${byPriority()}${velocity()}${goals()}</div>
+    <div class="stats-grid">${weeklyDone()}${burndown()}${byProject()}${byPriority()}${velocity()}${goals()}</div>
     <div class="tooltip" hidden></div>`;
   drawSlots(root);
 

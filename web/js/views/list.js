@@ -1,15 +1,16 @@
 // List tab: task tree with sorting, grouping and search.
-import { store, taskById, childrenOf, sprintById, categoryColor, byPriority, byDue, updateTask } from '../store.js';
+import { store, taskById, childrenOf, sprintById, projectById, projectList, projectLabel, projectColor, byPriority, byDue, updateTask } from '../store.js';
 import { openTaskEditor } from '../editor.js';
-import { catChip, metaBadges } from '../components.js';
+import { projectChip, metaBadges } from '../components.js';
 import { esc, prioIcon, statusName, empty } from '../util.js';
 
 const KEY = 'gtd.list';
-const state = { sort: 'priority', group: 'category', showDone: false, collapsed: [], ...JSON.parse(localStorage.getItem(KEY) || '{}'), q: '' };
+const state = { sort: 'priority', group: 'project', showDone: false, collapsed: [], ...JSON.parse(localStorage.getItem(KEY) || '{}'), q: '' };
 const persist = () => localStorage.setItem(KEY, JSON.stringify({ ...state, q: '' }));
 
 const SORTS = { priority: 'Priority', due: 'Due date', created: 'Newest first', title: 'Title' };
-const GROUPS = { category: 'Category', status: 'Status', sprint: 'Sprint', none: 'None' };
+const GROUPS = { project: 'Project', status: 'Status', sprint: 'Sprint', none: 'None' };
+if (!GROUPS[state.group]) state.group = 'project'; // saved views from before projects existed
 const STATUS_ORDER = { doing: 0, todo: 1, waiting: 2, done: 3 };
 
 const doneLast = (a, b) => (a.status === 'done') - (b.status === 'done');
@@ -28,7 +29,7 @@ const select = (key, options) =>
 export function render(root) {
   root.innerHTML = `
     <div class="toolbar">
-      <input type="search" class="q" placeholder="Search titles, notes, tags…" value="${esc(state.q)}">
+      <input type="search" class="q" placeholder="Search titles, notes, projects…" value="${esc(state.q)}">
       <label>Sort ${select('sort', SORTS)}</label>
       <label>Group ${select('group', GROUPS)}</label>
       <label class="check"><input type="checkbox" class="show-done" ${state.showDone ? 'checked' : ''}> show done</label>
@@ -81,7 +82,7 @@ function renderBody(root) {
   const q = state.q.trim().toLowerCase();
   if (q) {
     const hits = store.tasks
-      .filter((t) => visible(t) && [t.title, t.notes, t.category, t.waiting_for, ...t.tags].join(' ').toLowerCase().includes(q))
+      .filter((t) => visible(t) && [t.title, t.notes, projectLabel(t.project_id), t.waiting_for].join(' ').toLowerCase().includes(q))
       .sort(cmp);
     body.innerHTML = hits.map((t) => row(t, 0, { flat: true })).join('') || empty('Nothing found');
     return;
@@ -98,7 +99,7 @@ function renderBody(root) {
 function groups(roots) {
   if (state.group === 'none') return [{ name: '', items: roots }];
   const keyOf = {
-    category: (t) => t.category,
+    project: (t) => (projectById(t.project_id) ? t.project_id : ''),
     status: (t) => t.status,
     sprint: (t) => t.sprint_id ?? '',
   }[state.group];
@@ -109,9 +110,11 @@ function groups(roots) {
     map.get(k).push(t);
   }
   let keys = [...map.keys()];
-  if (state.group === 'category') {
-    keys.sort((a, b) => (a === '') - (b === '') || a.localeCompare(b, 'ru'));
-    return keys.map((k) => ({ name: k || 'No category', color: k ? categoryColor(k) : null, items: map.get(k) }));
+  if (state.group === 'project') {
+    // Same order as everywhere else: each project followed by its subprojects; no project last.
+    const order = new Map(projectList().map((p, i) => [p.id, i]));
+    keys.sort((a, b) => (a === '') - (b === '') || order.get(a) - order.get(b));
+    return keys.map((k) => ({ name: k === '' ? 'No project' : projectLabel(k), color: k === '' ? null : projectColor(k), items: map.get(k) }));
   }
   if (state.group === 'status') {
     keys.sort((a, b) => STATUS_ORDER[a] - STATUS_ORDER[b]);
@@ -141,7 +144,7 @@ function row(t, depth, { flat = false, hasKids = false, collapsed = false } = {}
     <span class="meta">
       ${metaBadges(t)}
       ${sprint && sprint.status !== 'closed' ? `<span class="badge sprint" title="Sprint">🏃 ${esc(sprint.name)}</span>` : ''}
-      ${state.group !== 'category' ? catChip(t.category) : ''}
+      ${state.group !== 'project' ? projectChip(t.project_id) : ''}
     </span>
   </div>`;
 }

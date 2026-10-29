@@ -1,6 +1,6 @@
 // Graph tab: tasks as nodes, with "subtask" and "depends on" links.
 // Hand-written force layout (Fruchterman–Reingold) in SVG, no libraries.
-import { store, taskById, categories, categoryColor } from '../store.js';
+import { store, taskById, projectById, projectList, projectColor } from '../store.js';
 import { openTaskEditor } from '../editor.js';
 import { esc, trunc, empty, freshBox, OTHER_COLOR } from '../util.js';
 
@@ -68,8 +68,10 @@ export function render(view) {
   const linked = new Set(edges.flatMap((e) => [e.s, e.t]));
   const nodes = opts.onlyLinked ? tasks.filter((t) => linked.has(t.id)) : tasks;
 
-  const usedCats = categories().filter((c) => nodes.some((t) => t.category === c));
-  const hasUncategorized = nodes.some((t) => !t.category || categoryColor(t.category) === OTHER_COLOR);
+  // Legend: top-level projects that appear in the graph (subprojects share their parent's color).
+  const rootId = (id) => { const p = projectById(id); return p ? p.parent_id ?? p.id : null; };
+  const usedRoots = projectList().filter((p) => p.parent_id == null && nodes.some((t) => rootId(t.project_id) === p.id));
+  const hasNoProject = nodes.some((t) => !projectById(t.project_id));
 
   root.innerHTML = `
     <div class="toolbar">
@@ -90,9 +92,9 @@ export function render(view) {
         <g class="viewport"><g class="edges"></g><g class="nodes"></g></g>
       </svg>
       ${nodes.length ? '' : empty('No links yet. Set a parent or "Depends on" in the task editor, or uncheck "linked only".')}
-      ${usedCats.length || hasUncategorized ? `<div class="cat-legend">
-        ${usedCats.filter((c) => categoryColor(c) !== OTHER_COLOR).map((c) => `<span><i class="dot" style="--c:${categoryColor(c)}"></i>${esc(c)}</span>`).join('')}
-        ${hasUncategorized ? `<span><i class="dot" style="--c:${OTHER_COLOR}"></i>other</span>` : ''}
+      ${usedRoots.length || hasNoProject ? `<div class="cat-legend">
+        ${usedRoots.map((p) => `<span><i class="dot" style="--c:${p.color}"></i>${esc(p.name)}</span>`).join('')}
+        ${hasNoProject ? `<span><i class="dot" style="--c:${OTHER_COLOR}"></i>no project</span>` : ''}
       </div>` : ''}
     </div>`;
 
@@ -145,7 +147,7 @@ export function render(view) {
     const r = radius(t);
     return `<g class="node st-${t.status}" data-id="${t.id}" transform="translate(${p.x},${p.y})">
       <circle r="${r + 8}" class="hit"/>
-      <circle r="${r}" fill="${categoryColor(t.category)}" class="${t.status === 'waiting' ? 'ring-waiting' : ''}"/>
+      <circle r="${r}" fill="${projectColor(t.project_id)}" class="${t.status === 'waiting' ? 'ring-waiting' : ''}"/>
       <text y="${r + 14}">${esc(trunc(t.title, 30))}</text>
       <title>${esc(t.title)}</title>
     </g>`;

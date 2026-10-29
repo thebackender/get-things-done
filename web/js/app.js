@@ -8,8 +8,9 @@ import * as backlog from './views/backlog.js';
 import * as calendar from './views/calendar.js';
 import * as graph from './views/graph.js';
 import * as stats from './views/stats.js';
+import * as settings from './views/settings.js';
 
-const VIEWS = { list, board, backlog, calendar, graph, stats };
+const VIEWS = { list, board, backlog, calendar, graph, stats, settings };
 const main = document.getElementById('view');
 const undoBtn = document.getElementById('undo-btn');
 

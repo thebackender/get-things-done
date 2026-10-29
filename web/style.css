@@ -86,14 +86,13 @@ main { padding: 16px; max-width: 1400px; margin: 0 auto; }
 
 /* ---------- badges and chips ---------- */
 
-.badge, .chip, .tag {
+.badge, .chip {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 12px; line-height: 18px;
   padding: 0 7px; border-radius: 10px;
   background: #f1f0ec; color: var(--ink-2);
   white-space: nowrap;
 }
-.tag { background: none; color: var(--muted); padding: 0 2px; }
 .chip { background: none; border: 1px solid var(--line); }
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
 .badge.doing { background: var(--accent-soft); color: var(--accent); }
@@ -257,6 +256,34 @@ svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
   padding: 5px 9px; border-radius: 6px; font-size: 12px;
   max-width: 320px;
 }
+
+/* ---------- settings ---------- */
+
+.settings { max-width: 900px; }
+.settings-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.settings-card h2 { margin-bottom: 4px; }
+.add-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.add-row input { flex: 1; }
+.manage-list { list-style: none; margin: 0; padding: 0; }
+.manage-list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.manage-list .name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; min-width: 120px; }
+.manage-list .muted { min-width: 60px; font-size: 12px; }
+.manage-list li.sub { padding-left: 22px; }
+.manage-list li.sub .name { font-weight: normal; }
+.manage-list li.inactive .name { color: var(--muted); }
+.manage-list li.inactive .dot { opacity: 0.4; }
+.manage-list label.check { font-size: 12px; color: var(--ink-2); }
+.swatches { display: inline-flex; gap: 4px; flex: 1; }
+.swatch { width: 18px; height: 18px; border-radius: 50%; padding: 0; border: 2px solid var(--card); background: var(--c); box-shadow: 0 0 0 1px var(--line-strong); }
+.swatch:hover { background: var(--c) !important; transform: scale(1.15); }
+.swatch.on { box-shadow: 0 0 0 2px var(--ink); }
+
+/* ---------- project picker ---------- */
+
+.editor .field { display: flex; flex-direction: column; gap: 4px; color: var(--ink-2); font-size: 13px; }
+.editor .field select, .editor .field input { color: var(--ink); font-size: 14px; }
+.inline-new { display: flex; gap: 6px; align-items: center; }
+.inline-new input { flex: 1; min-width: 0; }
 
 /* ---------- dialog ---------- */
 

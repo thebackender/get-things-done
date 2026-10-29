@@ -1,5 +1,5 @@
 // Calendar tab: a month view with tasks on their due dates.
-import { store, activeSprint, isOverdue, categoryColor, byPriority, taskById, updateTask } from '../store.js';
+import { store, activeSprint, isOverdue, projectColor, projectLabel, byPriority, taskById, updateTask } from '../store.js';
 import { openTaskEditor } from '../editor.js';
 import { cardClicks, dragAndDrop } from '../components.js';
 import { MONTHS, WEEKDAYS, esc, isoDate, today, prioIcon, freshBox } from '../util.js';
@@ -10,7 +10,7 @@ let showDone = true;
 function chip(t) {
   const overdue = isOverdue(t);
   return `<div class="cal-task st-${t.status}${overdue ? ' overdue' : ''}" draggable="true" data-id="${t.id}"
-    style="--c:${categoryColor(t.category)}" title="${esc(t.title)}${overdue ? ' (overdue)' : ''}">
+    style="--c:${projectColor(t.project_id)}" title="${esc(t.title)}${t.project_id ? ` · ${esc(projectLabel(t.project_id))}` : ''}${overdue ? ' (overdue)' : ''}">
     ${overdue ? '⚠ ' : ''}${prioIcon(t.priority)} ${esc(t.title)}</div>`;
 }
 
