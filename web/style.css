@@ -321,6 +321,21 @@ svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
 .swatch:hover { background: var(--c) !important; transform: scale(1.15); }
 .swatch.on { box-shadow: 0 0 0 2px var(--ink); }
 
+/* ---------- searchable dropdown (combo.js) ---------- */
+
+.combo { position: relative; }
+.combo-input { width: 100%; color: var(--ink); font-size: 14px; }
+.combo-list {
+  position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 2px);
+  max-height: 240px; overflow: auto; margin: 0; padding: 4px 0; list-style: none;
+  background: var(--card); border: 1px solid var(--line-strong); border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(11, 11, 11, 0.14); color: var(--ink); font-size: 14px;
+}
+.combo-list li { padding: 5px 10px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.combo-list li.active, .combo-list li:hover { background: var(--accent-soft); }
+.combo-list li.none { color: var(--muted); }
+.combo-list li.combo-empty { color: var(--muted); cursor: default; background: none; }
+
 /* ---------- project picker ---------- */
 
 .editor .field { display: flex; flex-direction: column; gap: 4px; color: var(--ink-2); font-size: 13px; }

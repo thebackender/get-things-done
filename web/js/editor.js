@@ -7,6 +7,7 @@ import {
   PRIORITIES, STATUSES, esc, opt, prioIcon, today, addDays, fmtDate, fmtTs, fmtNum, statusName, prioName, toast,
   dateInput, bindDateInputs, readDate,
 } from './util.js';
+import { comboHTML, bindCombos } from './combo.js';
 
 const dlg = document.getElementById('dialog');
 
@@ -17,7 +18,13 @@ async function requestClose() {
   if (!beforeClose || (await beforeClose())) dlg.close();
 }
 dlg.addEventListener('click', (e) => { if (e.target === dlg) requestClose(); });
-dlg.addEventListener('cancel', (e) => { e.preventDefault(); requestClose(); });
+dlg.addEventListener('cancel', (e) => {
+  e.preventDefault();
+  // Esc while a searchable dropdown is open closes just that dropdown.
+  const openList = dlg.querySelector('.combo-list:not([hidden])');
+  if (openList) return openList.closest('.combo').querySelector('.combo-input').blur();
+  requestClose();
+});
 
 /** "Unsaved changes" warning. Resolves to 'save', 'discard' or 'keep'. */
 const confirmDlg = document.getElementById('confirm-dialog');
@@ -140,7 +147,7 @@ export function openTaskEditor(task = null, preset = {}) {
         </span>
       </div>
       <label>Due date${dateInput('due', t.due)}</label>
-      <label>Parent<select name="parent_id"><option value="">— none —</option>${parents.map((p) => opt(p.id, p.title, t.parent_id)).join('')}</select></label>
+      <div class="field">Parent${comboHTML('parent_id', parents.map((p) => ({ value: p.id, label: p.title, hint: projectLabel(p.project_id) })), t.parent_id, { placeholder: '— none — (type to search)' })}</div>
       <label>Sprint<select name="sprint_id"><option value="">Backlog</option>${sprints.map((s) => opt(s.id, s.name + (s.status === 'active' ? ' (active)' : ''), t.sprint_id)).join('')}</select></label>
     </div>
     <label class="waiting-row" ${t.status === 'waiting' ? '' : 'hidden'}>Waiting for<input name="waiting_for" value="${esc(t.waiting_for)}" placeholder="e.g. reply from the visa office"></label>
@@ -179,6 +186,7 @@ export function openTaskEditor(task = null, preset = {}) {
   const form = dlg.querySelector('form');
   const el = form.elements;
   bindDateInputs(form);
+  bindCombos(form);
   const progressBox = form.querySelector('.progress-box');
 
   function renderProgress() {
