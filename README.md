@@ -1,6 +1,6 @@
 # GTD Planner
 
-A simple local planner: tasks, subtasks, priorities, projects, calendar, dependency graph, sprints, backlog and stats.
+A simple local planner: tasks, subtasks, priorities, projects, calendar, dependency graph, sprints and backlog.
 Needs only Python 3, no packages to install. All data lives in a single JSON file.
 
 ## Run
@@ -19,7 +19,6 @@ The server listens on `127.0.0.1` only, so it isn't reachable from the network.
 | Tasks | Task list on the left, calendar on the right; both show the same tasks. **Sprint** shows only the current sprint's tasks, with its dates, days left, progress and goals above the list; **All** shows everything. Done tasks stay in place, struck through. View: sort, group by project, status or sprint, hide done tasks. Drag a task from the list onto a calendar day to set its due date |
 | Backlog | Unfinished tasks without a sprint, plus those left over from sprints that have ended. Sprints are collapsed: click one to see its tasks. Drag a task onto a sprint (open or not) and its unfinished subtasks come along. Create and edit sprints here |
 | Graph | Tasks as nodes. Solid line: subtask. Dashed arrow A ⇢ B: A blocks B |
-| Stats | Summary, done per week, sprint burndown, projects, priorities, velocity, goals |
 | Projects | Projects and subprojects: create, rename, delete, pick a color, mark active or inactive |
 
 ### Calendar
@@ -79,12 +78,12 @@ Everywhere in the UI a task's project shows as `Project` or `Project:Subproject`
 (both required, sprints can't overlap), upcoming before that and past after it. `goals` is a list of strings, one per goal.
 Unfinished tasks of a past sprint keep their `sprint_id` but show up in the backlog until you drag them into another sprint.
 
-`history` records changes to status, sprint, priority, due date and progress (last 5000 entries). Burndown and cycle time are computed from it.
+`history` records changes to status, sprint, priority, due date and progress (last 5000 entries); the task editor shows a task's history.
 
 ### UI settings
 
 `data/settings.json` keeps the theme and each tab's view options: the Sprint / All filter, sorting, grouping, "Hide done" and collapsed tasks in the list,
-the year/month view of the calendar, which sprints are open in Backlog, the checkboxes in Graph, the goal picked in Stats. The page saves it as you change things.
+the year/month view of the calendar, which sprints are open in Backlog, the checkboxes in Graph. The page saves it as you change things.
 It is separate from `planner.json`: no undo, no history, no backups. Delete it to reset everything to defaults.
 
 ```json

@@ -6,12 +6,11 @@ import { toggleTheme } from './theme.js';
 import * as tasks from './views/tasks.js';
 import * as backlog from './views/backlog.js';
 import * as graph from './views/graph.js';
-import * as stats from './views/stats.js';
 import * as projects from './views/projects.js';
 
-const VIEWS = { list: tasks, backlog, graph, stats, projects };
-// Old tab links still work: Sprint and Calendar were merged into Tasks, Settings became Projects.
-const ALIASES = { board: 'list', calendar: 'list', settings: 'projects' };
+const VIEWS = { list: tasks, backlog, graph, projects };
+// Old tab links still work: Sprint and Calendar were merged into Tasks, Stats was removed, Settings became Projects.
+const ALIASES = { board: 'list', calendar: 'list', stats: 'list', settings: 'projects' };
 const main = document.getElementById('view');
 const undoBtn = document.getElementById('undo-btn');
 

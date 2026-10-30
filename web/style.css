@@ -557,62 +557,6 @@ circle.ring-waiting { stroke: var(--waiting-fg) !important; stroke-dasharray: 3 
 }
 .cat-legend span { display: inline-flex; align-items: center; gap: 6px; }
 
-/* ---------- stats ---------- */
-
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 20px; }
-.tile {
-  display: flex; flex-direction: column;
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 16px 18px; box-shadow: var(--shadow-xs);
-}
-.tile-label { order: -1; font-size: 13px; font-weight: 500; color: var(--muted-foreground); margin-bottom: 6px; }
-.tile-value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.tile-sub { color: var(--muted-foreground); font-size: 12px; margin-top: 2px; }
-.tile.critical .tile-value { color: var(--destructive); }
-
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 16px; }
-.stat-card {
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 18px; min-width: 0; box-shadow: var(--shadow-xs);
-}
-.stat-card h3 { font-size: 15px; margin-bottom: 12px; }
-.stat-card.wide { grid-column: 1 / -1; }
-.stat-card .empty { padding: 24px; }
-svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
-.chart .grid { stroke: var(--chart-grid); stroke-width: 1; }
-.chart .baseline { stroke: var(--chart-baseline); stroke-width: 1; }
-.chart .axis { fill: var(--muted-foreground); font-size: 11px; }
-.chart .label { fill: var(--foreground-2); font-size: 12px; }
-.chart .value { fill: var(--muted-foreground); font-size: 12px; }
-.chart .hit { fill: transparent; }
-.chart .hit:hover { fill: var(--hit-hover); }
-.chart .ideal { fill: none; stroke: var(--subtle); stroke-width: 1.5; stroke-dasharray: 5 4; }
-.chart .actual { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.chart .marker { stroke: var(--background); stroke-width: 2; pointer-events: none; }
-.chart-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px; }
-.chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.chart-legend .line { display: inline-block; width: 18px; border-top: 2px solid var(--c); }
-.chart-legend .line.dashed { border-top-style: dashed; }
-.table-view { margin-top: 10px; font-size: 12px; color: var(--foreground-2); }
-.table-view summary { cursor: pointer; color: var(--muted-foreground); font-weight: 500; }
-.table-view table { border-collapse: collapse; margin-top: 8px; }
-.table-view td, .table-view th { padding: 4px 16px 4px 0; text-align: left; border-bottom: 1px solid var(--border); }
-.table-view th { color: var(--muted-foreground); font-weight: 500; }
-.goal-row {
-  display: grid; grid-template-columns: minmax(160px, 2fr) 140px minmax(100px, 1fr) 90px; gap: 12px;
-  align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px;
-}
-.goal-row .track.wide { width: 100%; }
-.goal-row .goal-num { font-variant-numeric: tabular-nums; }
-.goal-row.st-done { color: var(--muted-foreground); }
-.goal-pick { margin: 16px 0 8px; color: var(--muted-foreground); font-size: 13px; font-weight: 500; display: flex; gap: 10px; align-items: center; }
-.tooltip {
-  position: fixed; z-index: 100; pointer-events: none;
-  background: var(--primary); color: var(--primary-foreground);
-  padding: 6px 10px; border-radius: var(--radius-sm); font-size: 12px;
-  max-width: 320px; box-shadow: var(--shadow-md);
-}
-
 /* ---------- settings ---------- */
 
 .settings { max-width: 960px; }
@@ -757,6 +701,5 @@ dialog:has(.editor.narrow) { width: min(510px, calc(100vw - 32px)); }
   .topbar { height: auto; padding: 10px 16px; flex-wrap: wrap; }
   main { padding: 16px; }
   .backlog-layout { grid-template-columns: 1fr; }
-  .stats-grid { grid-template-columns: 1fr; }
   .editor .grid { grid-template-columns: 1fr; }
 }

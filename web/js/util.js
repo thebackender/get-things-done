@@ -70,11 +70,6 @@ export function addDays(iso, n) {
 
 export const daysBetween = (a, b) => Math.round((parseDate(b) - parseDate(a)) / 86400000);
 
-/** Monday of the week containing the date. */
-export function weekStart(iso) {
-  const d = parseDate(iso);
-  return addDays(iso, -((d.getDay() + 6) % 7));
-}
 
 /** ISO "2026-10-30" -> "30.10.2026". Data is stored as ISO; the UI always shows DD.MM.YYYY. */
 export function fmtDate(iso) {
