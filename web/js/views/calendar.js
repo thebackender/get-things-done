@@ -133,11 +133,14 @@ function openDayPopover(root, dayEl, items) {
   pop.style.left = `${left}px`;
   pop.style.top = `${(below ? r.bottom + 6 : r.top - 6 - pop.offsetHeight) - box.top}px`;
 }
+/** Returns true if a popover was open. */
 function closePopover() {
-  document.querySelector('.day-pop')?.remove();
+  const pop = document.querySelector('.day-pop');
+  pop?.remove();
   document.querySelector('.mini-day.open')?.classList.remove('open');
+  return !!pop;
 }
-document.addEventListener('keydown', (e) => e.key === 'Escape' && closePopover());
+document.addEventListener('keydown', (e) => e.key === 'Escape' && closePopover() && e.preventDefault());
 
 // ---------- month view ----------
 

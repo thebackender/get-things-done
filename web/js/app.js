@@ -14,9 +14,12 @@ const ALIASES = { board: 'list', calendar: 'list', stats: 'list', settings: 'pro
 const main = document.getElementById('view');
 const undoBtn = document.getElementById('undo-btn');
 
+let current = 'list';
+
 function route() {
   const hash = location.hash.slice(1);
   const name = VIEWS[hash] ? hash : ALIASES[hash] ?? 'list';
+  current = name;
   document.querySelectorAll('#tabs a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === `#${name}`));
   // A fresh container each time, so the old view's event listeners go away with it.
   const root = document.createElement('div');
@@ -32,19 +35,32 @@ subscribe(() => {
 window.addEventListener('hashchange', route);
 window.addEventListener('themechange', route); // charts and the graph pick their colors in JS
 
-document.getElementById('add-task').addEventListener('click', () => openTaskEditor());
+/** New task with the current tab's defaults (its filters, or no sprint in the backlog). */
+const newTask = () => openTaskEditor(null, VIEWS[current].newTaskPreset?.() ?? {});
+document.getElementById('add-task').addEventListener('click', newTask);
 undoBtn.addEventListener('click', () => undo());
 document.getElementById('theme-btn').addEventListener('click', toggleTheme);
 
+// Shortcuts use e.code (the physical key), so they also work with a Russian keyboard layout.
 document.addEventListener('keydown', (e) => {
   const typing = e.target.closest('input, textarea, select, [contenteditable]');
-  if (typing || document.getElementById('dialog').open) return;
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+  const dialogOpen = document.getElementById('dialog').open || document.getElementById('confirm-dialog').open;
+  if (e.key === 'Escape') {
+    // Esc closes what's open first (menus, popovers and dialogs handle it themselves), then acts on the tab.
+    if (e.defaultPrevented || dialogOpen) return;
+    const menus = document.querySelectorAll('details.view-menu[open]');
+    if (menus.length) return menus.forEach((d) => d.removeAttribute('open'));
+    if (typing) return e.target.blur();
+    VIEWS[current].onEscape?.();
+    return;
+  }
+  if (typing || dialogOpen) return;
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === 'KeyZ') {
     e.preventDefault();
     undo();
-  } else if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'n') {
+  } else if (!e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'KeyN') {
     e.preventDefault();
-    openTaskEditor();
+    newTask();
   }
 });
 

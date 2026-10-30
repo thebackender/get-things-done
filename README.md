@@ -29,9 +29,11 @@ Year view: 12 months from the sprint's month; a dot marks days with tasks (red: 
 
 ## Keyboard shortcuts
 
-- `N`: new task
+- `N`: new task, inside the current filters: the shown sprint (Sprint filter), and the project / priority if exactly one is picked. In Backlog it goes to the backlog; in Graph it shows up right away, ready to link
 - `Ctrl+Z`: undo the last action (up to 30 steps while the server is running)
-- `Esc`: close the dialog
+- `Esc`: close the dialog, menu or popover; in Graph (with nothing open) fit the whole graph
+
+Shortcuts work with any keyboard layout (they use the key's position, so `N` is also `Т` on a Russian layout).
 
 ## Data
 

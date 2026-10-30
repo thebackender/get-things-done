@@ -7,7 +7,7 @@ import { projectChip, metaBadges, openContextMenu, taskMenuItems } from '../comp
 import { esc, prioIcon, prioClass, prioName, empty, freshBox, trunc, toast } from '../util.js';
 import { icon } from '../icons.js';
 import { getPrefs, setPrefs } from '../prefs.js';
-import { listFilter, listView, setListView, isCollapsed, toggleCollapsed, filterMenus, handleFilterEvent } from './list.js';
+import { listFilter, listView, setListView, isCollapsed, toggleCollapsed, filterMenus, handleFilterEvent, newTaskPreset as listPreset } from './list.js';
 
 const W = 250; // card size
 const H = 58;
@@ -50,6 +50,13 @@ function freeSpot(p, others) {
 }
 let camera = null; // {x, y, k}: pan and zoom, kept across re-renders
 let q = ''; // search; not saved
+// Tasks that appeared while the graph was open (e.g. just created with N) show even without links, so they can be linked.
+let seen = null;
+const fresh = new Set();
+let fitCurrent = null; // Fit for the graph on screen (Esc)
+
+export const newTaskPreset = () => listPreset();
+export const onEscape = () => fitCurrent?.();
 // After folding/unfolding, keep the clicked card at the same spot on screen: {id, x, y} in screen pixels.
 let anchor = null;
 
@@ -197,6 +204,7 @@ const HELP = [
   'Hover a card and drag the orange → handle onto another card: the first task then blocks the second.',
   'Click a link to remove it.',
   '− on a card folds its subtasks.',
+  'N creates a task (it shows here right away, ready to link); Esc fits the whole graph.',
   'Drag a card to move it (Reset card positions under View puts them back); drag the background or scroll to move the view; Ctrl + scroll to zoom.',
 ].join('\n');
 
@@ -236,7 +244,10 @@ export function render(view, openMenu = null) {
   }
   // A task with subtasks counts as linked even while they're hidden.
   const linked = new Set([...edges.flatMap((e) => [e.s, e.t]), ...hasKids]);
-  const nodes = opts.onlyLinked ? tasks.filter((t) => linked.has(t.id)) : tasks;
+  const appeared = seen ? store.tasks.filter((t) => !seen.has(t.id)).map((t) => t.id) : [];
+  appeared.forEach((id) => fresh.add(id));
+  seen = new Set(store.tasks.map((t) => t.id));
+  const nodes = opts.onlyLinked ? tasks.filter((t) => linked.has(t.id) || fresh.has(t.id)) : tasks;
   const kidCount = (id) => all.filter((t) => t.parent_id === id).length;
 
   root.innerHTML = `
@@ -334,6 +345,10 @@ export function render(view, openMenu = null) {
   }
   anchor = null;
   apply();
+  fitCurrent = fit;
+  // Bring a task that was just created into view.
+  const created = appeared.filter((id) => pos.has(id)).at(-1);
+  if (created != null) centerOn(created);
 
   // ---------- hover: the card itself changes (CSS); its links get a little bolder; its link handle shows ----------
   let hovered = null;

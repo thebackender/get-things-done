@@ -146,12 +146,16 @@ export function openContextMenu(x, y, items) {
   menu.querySelector('button')?.focus();
 }
 
+/** Returns true if a menu was open. */
 export function closeContextMenu() {
-  document.querySelector('.ctx-menu')?.remove();
+  const menu = document.querySelector('.ctx-menu');
+  menu?.remove();
+  return !!menu;
 }
 
 document.addEventListener('pointerdown', (e) => !e.target.closest?.('.ctx-menu') && closeContextMenu(), true);
-document.addEventListener('keydown', (e) => e.key === 'Escape' && closeContextMenu());
+// Esc closes the menu first; preventDefault tells app.js the key is used up.
+document.addEventListener('keydown', (e) => e.key === 'Escape' && closeContextMenu() && e.preventDefault());
 window.addEventListener('resize', closeContextMenu);
 document.addEventListener('scroll', closeContextMenu, true);
 

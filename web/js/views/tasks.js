@@ -3,6 +3,8 @@ import * as list from './list.js';
 import * as calendar from './calendar.js';
 import { freshBox } from '../util.js';
 
+export const newTaskPreset = list.newTaskPreset;
+
 export function render(view) {
   const root = freshBox(view);
   root.innerHTML = `<div class="tasks-layout">

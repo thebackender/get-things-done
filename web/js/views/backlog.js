@@ -57,6 +57,9 @@ function sprintBox(s) {
   </div>`;
 }
 
+/** N / New task here creates a backlog task (no sprint). */
+export const newTaskPreset = () => ({ sprint_id: null });
+
 export function render(view) {
   const root = freshBox(view);
   const backlog = store.tasks.filter(inBacklog);

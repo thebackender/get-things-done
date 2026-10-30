@@ -64,6 +64,16 @@ const shown = (t) => scopeFilter(t) && !(state.hideDone && t.status === 'done');
 export const listFilter = (t) => shown(t);
 
 export const listView = () => ({ scope: state.scope, hideDone: state.hideDone });
+
+/** A new task (N, New task) starts inside the current filters: the shown sprint, and a project / priority if exactly one is picked. */
+export function newTaskPreset() {
+  const preset = {};
+  const sprint = scopeSprint();
+  if (sprint) preset.sprint_id = sprint.id;
+  if (state.projects.length === 1 && state.projects[0] !== 'none') preset.project_id = state.projects[0];
+  if (state.priorities.length === 1) preset.priority = state.priorities[0];
+  return preset;
+}
 export function setListView(patch) {
   Object.assign(state, patch);
   persist();
