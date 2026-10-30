@@ -25,7 +25,7 @@ The server listens on `127.0.0.1` only, so it isn't reachable from the network.
 
 The calendar starts at the current sprint (at today if there is none); the ◎ button between the arrows brings you back.
 Month view: 5 weeks from the sprint's first week (or the whole sprint if it's longer), square cells, up to 3 tasks per day, fewer if the cell is small ("+N more" opens the rest), every other month tinted. Drag a task to another day to move its due date.
-Year view: 12 months from the sprint's month; a dot marks days with tasks (red: overdue, orange: urgent), click a day to see its tasks. Click an empty day in either view to add a task.
+Year view: 12 months from the sprint's month; a dot marks days with tasks (red: overdue, orange: urgent), click a day to see its tasks. In the month view, a click on a day also opens its task list; "New task" at the bottom of the list adds a task due that day (in the year view, a click on an empty day adds one right away).
 
 ## Keyboard shortcuts
 

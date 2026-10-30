@@ -420,7 +420,7 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
   container-type: inline-size; /* the month name scales with the cell */
 }
 .day.alt { background: var(--month-alt); }
-.day:hover { outline: 1px solid var(--border-strong); outline-offset: -1px; }
+.day:hover, .day.open { outline: 1px solid var(--border-strong); outline-offset: -1px; }
 .day.in-sprint { box-shadow: inset 0 2px 0 var(--sprint); }
 .day-num { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; min-height: 20px; margin-bottom: 2px; font-size: 12px; font-weight: 500; color: var(--foreground-2); }
 .day-num .n { display: inline-flex; align-items: center; justify-content: center; flex: none; height: 20px; border-radius: 999px; }
@@ -540,7 +540,7 @@ button.mini-day.in-sprint:hover:not(:disabled) { background: var(--muted); }
 .mini-dot.overdue { background: var(--destructive); }
 .mini-dot.done { background: var(--faint); }
 
-/* Tasks of one day, opened from the year view. */
+/* Tasks of one day, opened by clicking a day. */
 .day-pop {
   position: absolute; z-index: 30; width: 300px; padding: 6px;
   background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg);
@@ -551,6 +551,7 @@ button.pop-task, .day-pop button.add {
   width: 100%; height: 32px; justify-content: flex-start; gap: 6px; padding: 0 8px;
   border: 0; box-shadow: none; background: transparent; font-size: 13px; font-weight: 400;
 }
+.day-pop .pop-none { padding: 6px 8px; font-size: 13px; color: var(--muted-foreground); }
 .pop-task .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
 .pop-task.st-done .t { text-decoration: line-through; color: var(--muted-foreground); }
 .pop-task.overdue .t { color: var(--destructive); }

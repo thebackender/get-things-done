@@ -101,7 +101,7 @@ function yearView(firstMonth, byDate, sprint, now) {
     miniMonth(d.getFullYear(), d.getMonth(), i === 0 || d.getMonth() === 0, byDate, sprint, now)).join('')}</div>`;
 }
 
-// Popover with the tasks of one day (year view).
+// Popover with the tasks of one day, and "New task" for that day (month and year view).
 function openDayPopover(root, dayEl, items) {
   closePopover();
   const iso = dayEl.dataset.date;
@@ -110,12 +110,13 @@ function openDayPopover(root, dayEl, items) {
   pop.className = 'day-pop';
   pop.innerHTML = `
     <header><b>${WEEKDAYS[(d.getDay() + 6) % 7]}, ${fmtDate(iso)}</b><span class="muted">${items.length}</span></header>
-    <ul>${items.map((t) => `<li><button type="button" class="pop-task st-${t.status}${isOverdue(t) ? ' overdue' : ''}" data-id="${t.id}">
+    <ul>${items.length ? '' : '<li class="pop-none">No tasks</li>'}${items.map((t) => `<li><button type="button" class="pop-task st-${t.status}${isOverdue(t) ? ' overdue' : ''}" data-id="${t.id}">
       <i class="dot" style="--c:${projectColor(t.project_id)}"></i>${prioIcon(t.priority)}<span class="t">${esc(t.title)}</span></button></li>`).join('')}</ul>
     <button type="button" class="ghost add">${icon('plus', 14)} New task</button>`;
   // The tab's .view element is the anchor (root itself is display: contents and has no box).
   const anchor = root.parentElement;
   anchor.append(pop);
+  dayEl.classList.add('open');
   pop.addEventListener('click', (e) => {
     const task = e.target.closest('.pop-task');
     const add = e.target.closest('.add');
@@ -136,10 +137,16 @@ function openDayPopover(root, dayEl, items) {
 function closePopover() {
   const pop = document.querySelector('.day-pop');
   pop?.remove();
-  document.querySelector('.mini-day.open')?.classList.remove('open');
+  document.querySelector('.mini-day.open, .day.open')?.classList.remove('open');
   return !!pop;
 }
 document.addEventListener('keydown', (e) => e.key === 'Escape' && closePopover() && e.preventDefault());
+// A click anywhere else closes it (days handle their own clicks: another day opens its list instead).
+document.addEventListener('pointerdown', (e) => {
+  const t = e.target;
+  if (t.closest?.('.day-pop') || (t.closest?.('.day, .mini-day') && !t.closest('.cal-task'))) return;
+  closePopover();
+}, true);
 
 // ---------- month view ----------
 
@@ -163,7 +170,7 @@ function monthView({ first, weeks }, byDate, sprint, now) {
     const items = byDate.get(iso) || [];
     const shown = items.length > MAX_CHIPS ? items.slice(0, MAX_CHIPS - 1) : items;
     const more = items.length - shown.length;
-    cells += `<div class="day drop ${cls}" data-date="${iso}" title="Click to add a task due on this day">
+    cells += `<div class="day drop ${cls}" data-date="${iso}" title="Click to see this day's tasks or add one">
       <div class="day-num"><span class="n">${d.getDate()}</span>${mon}</div>${shown.map(chip).join('')}${
       more ? `<button type="button" class="more">+${more} more</button>` : ''}</div>`;
   }
@@ -299,9 +306,9 @@ export function render(view) {
     if (e.target.closest('.cal-task')) return;
     const day = e.target.closest('.day');
     if (!day) return;
-    if (e.target.closest('.more')) return openDayPopover(root, day, byDate.get(day.dataset.date) || []);
-    closePopover();
-    openTaskEditor(null, { due: day.dataset.date });
+    // A day opens its task list (with "New task" at the bottom); a second click closes it.
+    if (day.classList.contains('open')) return closePopover();
+    openDayPopover(root, day, byDate.get(day.dataset.date) || []);
   });
   dragAndDrop(root, '.day', moveDue);
 }
