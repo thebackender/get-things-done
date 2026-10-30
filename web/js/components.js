@@ -3,6 +3,7 @@ import { taskById, childrenOf, descendants, blockers, isOverdue, goalSum, projec
 import { openTaskEditor } from './editor.js';
 import { esc, fmtDate, fmtNum, prioIcon, prioClass, toast } from './util.js';
 import { icon } from './icons.js';
+import { confirmDialog, promptDialog } from './dialogs.js';
 
 /** "Project" or "Project:Subproject" with the project's color dot. */
 export function projectChip(id) {
@@ -65,8 +66,14 @@ export function card(t, { depth = 0, showParent = true, note = '' } = {}) {
 
 export async function promptProgress(id) {
   const t = taskById(id);
-  const raw = prompt(`How much to add to "${t.title}"${t.unit ? ` (${t.unit})` : ''}?`);
-  if (raw == null || !raw.trim()) return;
+  const raw = await promptDialog({
+    title: 'Add progress',
+    text: `How much to add to "${t.title}"${t.unit ? ` (${t.unit})` : ''}? A negative number takes some back.`,
+    placeholder: t.unit ? `e.g. 2 ${t.unit}` : 'e.g. 2',
+    ok: 'Add',
+    attrs: 'inputmode="decimal"',
+  });
+  if (!raw) return;
   const value = Number(raw.replace(',', '.'));
   if (!Number.isFinite(value) || value === 0) return toast('Enter a non-zero number', 'error');
   await addProgress(id, value);
@@ -177,7 +184,14 @@ export function taskMenuItems(t) {
     null,
     {
       label: 'Delete…', icon: 'x', danger: true,
-      action: () => confirm(`Delete "${t.title}"${subs ? ` and its ${subs} subtask(s)` : ''}? Ctrl+Z brings it back.`) && deleteTask(t.id),
+      action: async () => {
+        const yes = await confirmDialog({
+          title: subs ? 'Delete task and subtasks?' : 'Delete task?',
+          text: `"${t.title}"${subs ? ` and its ${subs} subtask(s)` : ''} will be deleted. Ctrl+Z brings it back.`,
+          ok: 'Delete', danger: true,
+        });
+        if (yes) deleteTask(t.id);
+      },
     },
   ].filter((it) => it !== undefined);
 }

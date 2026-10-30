@@ -8,6 +8,7 @@ import {
   dateInput, bindDateInputs, readDate,
 } from './util.js';
 import { comboHTML, bindCombos, pickerHTML, bindPickers } from './combo.js';
+import { ask, confirmDialog } from './dialogs.js';
 import { icon } from './icons.js';
 
 const dlg = document.getElementById('dialog');
@@ -28,36 +29,15 @@ dlg.addEventListener('cancel', (e) => {
 });
 
 /** "Unsaved changes" warning. Resolves to 'save', 'discard' or 'keep'. */
-const confirmDlg = document.getElementById('confirm-dialog');
-function askUnsaved() {
-  return new Promise((resolve) => {
-    confirmDlg.innerHTML = `<form method="dialog" class="confirm">
-      <h3>Unsaved changes</h3>
-      <p>You changed this task but didn't save it.</p>
-      <footer>
-        <button value="keep">Keep editing</button>
-        <span class="spacer"></span>
-        <button value="discard" class="danger">Discard</button>
-        <button value="save" class="primary" autofocus>Save</button>
-      </footer>
-    </form>`;
-    let answered = false;
-    const answer = (value) => {
-      if (answered) return;
-      answered = true;
-      if (confirmDlg.open) confirmDlg.close(value);
-      resolve(value);
-    };
-    // Answer right on click instead of waiting for the dialog's close event, which arrives later.
-    confirmDlg.querySelectorAll('button[value]').forEach((b) => {
-      b.onclick = (e) => { e.preventDefault(); answer(b.value); };
-    });
-    confirmDlg.onclick = (e) => { if (e.target === confirmDlg) answer('keep'); }; // backdrop
-    // Esc: handled on "cancel", which fires right away (a late "close" event could answer the next question).
-    confirmDlg.oncancel = (e) => { e.preventDefault(); answer('keep'); };
-    confirmDlg.showModal();
-  });
-}
+const askUnsaved = () => ask({
+  title: 'Unsaved changes',
+  text: "You changed this task but didn't save it.",
+  dismiss: 'keep',
+  buttons: [
+    { value: 'keep', label: 'Keep editing' }, { spacer: true },
+    { value: 'discard', label: 'Discard', kind: 'danger' }, { value: 'save', label: 'Save', kind: 'primary', focus: true },
+  ],
+});
 
 const NEW_TASK = {
   title: '', parent_id: null, status: 'todo', priority: 0, project_id: null, due: null,
@@ -323,10 +303,15 @@ export function openTaskEditor(task = null, preset = {}) {
     if (act === 'add-sub') leaveThen(() => openTaskEditor(null, { parent_id: t.id, project_id: t.project_id, sprint_id: t.sprint_id }));
     if (act === 'delete') {
       const n = descendants(t.id).length;
-      if (confirm(`Delete "${t.title}"${n ? ` and its ${n} subtask(s)` : ''}?`)) {
+      confirmDialog({
+        title: n ? 'Delete task and subtasks?' : 'Delete task?',
+        text: `"${t.title}"${n ? ` and its ${n} subtask(s)` : ''} will be deleted. Ctrl+Z brings it back.`,
+        ok: 'Delete', danger: true,
+      }).then((yes) => {
+        if (!yes) return;
         dlg.close();
         deleteTask(t.id);
-      }
+      });
     }
     if (act === 'add-progress') {
       const value = Number(form.querySelector('.pv').value);
@@ -459,9 +444,16 @@ export function openSprintEditor(sprint = null) {
       if (goalsBox.children.length > 1) row.remove();
       else row.querySelector('input').value = '';
     }
-    if (act === 'delete' && confirm(`Delete sprint "${s.name}"?${count ? ` Its ${count} task(s) will go back to the backlog.` : ''}`)) {
-      dlg.close();
-      deleteSprint(s.id);
+    if (act === 'delete') {
+      confirmDialog({
+        title: 'Delete sprint?',
+        text: `"${s.name}" will be deleted.${count ? ` Its ${count} task(s) will go back to the backlog.` : ''} Ctrl+Z brings it back.`,
+        ok: 'Delete', danger: true,
+      }).then((yes) => {
+        if (!yes) return;
+        dlg.close();
+        deleteSprint(s.id);
+      });
     }
   };
   if (!dlg.open) dlg.showModal();

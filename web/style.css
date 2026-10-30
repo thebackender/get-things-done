@@ -766,6 +766,11 @@ dialog:has(.editor.narrow) { width: min(510px, calc(100vw - 32px)); }
 .confirm h3 { font-size: 17px; margin: 0; }
 .confirm p { margin: 0; color: var(--muted-foreground); }
 .confirm footer { display: flex; gap: 8px; margin-top: 12px; }
+.confirm .dialog-input { width: 100%; margin-top: 6px; }
+/* The main button of a dialog that deletes something. */
+/* The same strong red in both themes, so white text stays readable. */
+button.destructive { background: #dc2626; border-color: #dc2626; color: #fff; }
+button.destructive:hover:not(:disabled) { background: #b91c1c; }
 
 /* ---------- toast (sonner-like) ---------- */
 

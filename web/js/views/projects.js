@@ -3,6 +3,7 @@ import { store, projectList, projectById, isSelectable, createProject, updatePro
 import { PALETTE, OTHER_COLOR, esc, empty, freshBox, paint, toast } from '../util.js';
 import { icon } from '../icons.js';
 import { isDark } from '../theme.js';
+import { confirmDialog, promptDialog } from '../dialogs.js';
 
 // Color picker: Coloris (web/vendor/coloris), loaded as a plain script. The palette colors are its quick swatches.
 function setupPicker(root) {
@@ -101,16 +102,18 @@ export function render(view) {
     const p = projectById(Number(row.dataset.project));
     const act = e.target.closest('button[data-act]')?.dataset.act;
     if (act === 'rename') {
-      const name = prompt('Rename project', p.name)?.trim();
-      const max = store.limits.project_name;
-      if (name && max && name.length > max) return toast(`Project name is too long: ${name.length} characters, at most ${max}`, 'error');
-      if (name && name !== p.name) updateProject(p.id, { name });
+      promptDialog({ title: 'Rename project', value: p.name, ok: 'Rename', attrs: maxlength('project_name') })
+        .then((name) => name && name !== p.name && updateProject(p.id, { name }));
     }
     if (act === 'delete') {
       const subs = subprojectsOf(p.id);
       const n = taskCount(p.id) + subs.reduce((s, c) => s + taskCount(c.id), 0);
       const what = subs.length ? `"${p.name}" and its ${subs.length} subproject(s)` : `"${p.name}"`;
-      if (confirm(`Delete ${what}?${n ? ` ${plural(n)} will be left without a project.` : ''}`)) deleteProject(p.id);
+      confirmDialog({
+        title: subs.length ? 'Delete project and subprojects?' : 'Delete project?',
+        text: `${what} will be deleted.${n ? ` ${plural(n)} will be left without a project.` : ''} Ctrl+Z brings it back.`,
+        ok: 'Delete', danger: true,
+      }).then((yes) => yes && deleteProject(p.id));
     }
   });
 }
