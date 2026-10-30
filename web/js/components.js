@@ -23,7 +23,7 @@ export function progressBar(done, total) {
   return `<span class="track wide"><span class="fill" style="width:${pct}%"></span></span>`;
 }
 
-/** Task status badges: subtasks, goal, waiting, blocked, due date. */
+/** Task status badges: subtasks, goal, related tasks, waiting, blocked, due date. */
 export function metaBadges(t) {
   const parts = [];
   const kids = childrenOf(t.id);
@@ -32,6 +32,11 @@ export function metaBadges(t) {
     parts.push(`<span class="badge" title="Subtasks">${icon('listChecks', 12)} ${done}/${kids.length}</span>`);
   }
   if (t.target != null) parts.push(goalBar(t));
+  const related = (t.related ?? []).map(taskById).filter(Boolean);
+  if (related.length) {
+    const titles = related.map((r) => r.title).join(', ');
+    parts.push(`<span class="badge related" title="Related: ${esc(titles)}">${icon('link', 12)} ${related.length}</span>`);
+  }
   if (t.status === 'waiting') {
     const tip = t.waiting_for ? `Waiting for: ${esc(t.waiting_for)}` : 'Waiting';
     parts.push(`<span class="badge waiting icon-only" title="${tip}" aria-label="${tip}">${icon('hourglass', 12)}</span>`);

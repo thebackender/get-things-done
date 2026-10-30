@@ -41,7 +41,7 @@ const askUnsaved = () => ask({
 
 const NEW_TASK = {
   title: '', parent_id: null, status: 'todo', priority: 0, project_id: null, due: null,
-  depends_on: [], sprint_id: null, notes: '', waiting_for: '', target: null, unit: '', progress: [],
+  depends_on: [], related: [], sprint_id: null, notes: '', waiting_for: '', target: null, unit: '', progress: [],
 };
 
 const NEW_PROJECT = '__new__';
@@ -148,6 +148,7 @@ export function openTaskEditor(task = null, preset = {}) {
 
     ${relationSection('depends_on', 'Blocked by', 'tasks that must be done before this one', others, blockedBy)}
     ${relationSection('blocking', 'Blocking', 'tasks that wait for this one', others, blocking)}
+    ${relationSection('related', 'Related', 'linked without blocking or nesting; shown on both tasks', others, t.related ?? [])}
 
     ${isNew ? '' : `<details ${kids.length ? 'open' : ''}>
       <summary>Subtasks <span class="count">${kids.length}</span></summary>
@@ -307,6 +308,7 @@ export function openTaskEditor(task = null, preset = {}) {
       waiting_for: el.waiting_for.value.trim(),
       depends_on: checkedIds('depends_on'),
       blocking: checkedIds('blocking'), // the server updates "Blocked by" on those tasks
+      related: checkedIds('related'), // the server adds or removes this task on the other side too
       target,
       unit: goal ? el.unit.value.trim() : '',
       progress,
@@ -378,6 +380,7 @@ export function openTaskEditor(task = null, preset = {}) {
     }
     if (e.target.name === 'is_goal') form.querySelector('.goal-body').hidden = !e.target.checked;
     if (e.target.name === 'depends_on' || e.target.name === 'blocking') syncRelations();
+    if (e.target.name === 'related') form.querySelector('.rel-count[data-for=related]').textContent = checkedIds('related').length;
   };
 
   // Enter in the progress and new project boxes adds an item instead of submitting the form.

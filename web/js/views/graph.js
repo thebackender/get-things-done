@@ -88,7 +88,13 @@ const matches = (t) => !!q && t.title.toLowerCase().includes(q.toLowerCase());
 function layout(nodes, edges, maxWidth, weight) {
   const out = new Map(nodes.map((t) => [t.id, []]));
   const inc = new Map(nodes.map((t) => [t.id, []]));
+  const rel = new Map(nodes.map((t) => [t.id, []])); // "Related": no direction, so it keeps cards together but sets no column
   for (const e of edges) {
+    if (e.kind === 'rel') {
+      rel.get(e.s).push(e.t);
+      rel.get(e.t).push(e.s);
+      continue;
+    }
     out.get(e.s).push(e.t);
     inc.get(e.t).push(e.s);
   }
@@ -104,7 +110,7 @@ function layout(nodes, edges, maxWidth, weight) {
     while (stack.length) {
       const id = stack.pop();
       ids.push(id);
-      for (const n of [...out.get(id), ...inc.get(id)]) {
+      for (const n of [...out.get(id), ...inc.get(id), ...rel.get(id)]) {
         if (!group.has(n)) { group.set(n, groups.length); stack.push(n); }
       }
     }
@@ -208,9 +214,17 @@ function foldHTML(id, p, folded, count, left) {
 /** The fold button sits on the side the subtask links leave from. */
 const foldAt = (p, left) => `translate(${left ? p.x : p.x + W},${p.y + H / 2})`;
 
-/** Shown on hover at the card's bottom edge: drag it onto another card to make this task block that one. */
+/**
+ * Two handles shown on hover at the card's bottom edge; drag one onto another card:
+ * orange → makes this task block that one, blue (chain) links the two as related.
+ */
+const handleAt = (p, kind) => `translate(${p.x + W - (kind === 'rel' ? 48 : 24)},${p.y + H})`;
 function handleHTML(id, p) {
-  return `<g class="link-handle" data-link="${id}" transform="translate(${p.x + W - 24},${p.y + H})">
+  return `<g class="link-handle rel" data-link="${id}" data-kind="rel" transform="${handleAt(p, 'rel')}">
+    <title>Drag onto a task: the two are related (no blocking, no nesting)</title>
+    <circle r="8"/><path d="M-1 -2.2H-2.6a2.2 2.2 0 0 0 0 4.4H-1M1 -2.2H2.6a2.2 2.2 0 0 1 0 4.4H1M-1.6 0H1.6"/>
+  </g>
+  <g class="link-handle dep" data-link="${id}" data-kind="dep" transform="${handleAt(p, 'dep')}">
     <title>Drag onto a task: this task blocks it</title>
     <circle r="8"/><path d="M-3.5 0H3.5M1 -2.5L3.5 0L1 2.5"/>
   </g>`;
@@ -219,6 +233,7 @@ function handleHTML(id, p) {
 const HELP = [
   'Click a card to edit it; right-click it for more actions.',
   'Hover a card and drag the orange → handle onto another card: the first task then blocks the second.',
+  'The blue chain handle next to it links the two tasks as related instead (no blocking, no nesting).',
   'Click a link to remove it.',
   '− on a card folds its subtasks.',
   'N creates a task (it shows here right away, ready to link); Esc fits the whole graph.',
@@ -259,6 +274,7 @@ export function render(view, openMenu = null) {
   for (const t of tasks) {
     if (t.parent_id != null && ids.has(t.parent_id)) edges.push({ s: t.parent_id, t: t.id, kind: 'child' });
     for (const d of t.depends_on) if (ids.has(d)) edges.push({ s: d, t: t.id, kind: 'dep' });
+    for (const r of t.related ?? []) if (ids.has(r) && t.id < r) edges.push({ s: t.id, t: r, kind: 'rel' }); // once per pair
   }
   // A task with subtasks counts as linked even while they're hidden.
   const linked = new Set([...edges.flatMap((e) => [e.s, e.t]), ...hasKids]);
@@ -288,6 +304,7 @@ export function render(view, openMenu = null) {
       <span class="legend">
         <span><svg width="26" height="10"><path d="M2 5H24" class="edge child"/></svg> subtask</span>
         <span><svg width="26" height="10"><path d="M2 5H18" class="edge dep" marker-end="url(#arrow)"/></svg> blocks</span>
+        <span><svg width="26" height="10"><path d="M2 5H24" class="edge rel"/></svg> related</span>
       </span>
       <span class="help" tabindex="0" title="${esc(HELP)}">?</span>
       <button data-act="fit" title="Show the whole graph">Fit</button>
@@ -386,7 +403,7 @@ export function render(view, openMenu = null) {
       return;
     }
     root.querySelectorAll(`.edges .edge[data-s="${key}"], .edges .edge[data-t="${key}"]`).forEach((el) => el.classList.add('hl'));
-    root.querySelector(`.link-handle[data-link="${key}"]`)?.classList.add('show');
+    root.querySelectorAll(`.link-handle[data-link="${key}"]`).forEach((h) => h.classList.add('show'));
   };
   svg.addEventListener('pointerover', (e) => {
     if (drag?.moved || drag?.link != null) return;
@@ -408,11 +425,20 @@ export function render(view, openMenu = null) {
     pin(to);
     if (await updateTask(to, { depends_on: [...b.depends_on, from] })) toast(`${short(a)} blocks ${short(b)} now`);
   };
+  const addRelated = async (from, to) => {
+    const a = taskById(from), b = taskById(to);
+    if (a.related.includes(to)) return toast(`${short(a)} and ${short(b)} are already related`);
+    pin(to);
+    if (await updateTask(from, { related: [...a.related, to] })) toast(`${short(a)} and ${short(b)} are related now`);
+  };
   const linkMenu = (x, y, kind, s, t) => {
     const a = taskById(s), b = taskById(t);
-    openContextMenu(x, y, kind === 'dep'
-      ? [{ label: `Remove: ${short(a)} blocks ${short(b)}`, icon: 'x', danger: true, action: () => { pin(t); updateTask(t, { depends_on: b.depends_on.filter((d) => d !== s) }); } }]
-      : [{ label: `Detach ${short(b)} from ${short(a)}`, icon: 'x', danger: true, action: () => { pin(s); updateTask(t, { parent_id: null }); } }]);
+    const items = {
+      dep: [{ label: `Remove: ${short(a)} blocks ${short(b)}`, icon: 'x', danger: true, action: () => { pin(t); updateTask(t, { depends_on: b.depends_on.filter((d) => d !== s) }); } }],
+      child: [{ label: `Detach ${short(b)} from ${short(a)}`, icon: 'x', danger: true, action: () => { pin(s); updateTask(t, { parent_id: null }); } }],
+      rel: [{ label: `Unlink ${short(a)} and ${short(b)}`, icon: 'x', danger: true, action: () => { pin(s); updateTask(s, { related: a.related.filter((r) => r !== t) }); } }],
+    };
+    openContextMenu(x, y, items[kind]);
   };
   svg.addEventListener('contextmenu', (e) => {
     const node = e.target.closest('[data-node]');
@@ -435,7 +461,7 @@ export function render(view, openMenu = null) {
     for (const f of [id, taskById(id)?.parent_id]) {
       if (f != null && pos.has(f)) root.querySelector(`.fold[data-fold="${f}"]`)?.setAttribute('transform', foldAt(pos.get(f), kidsOnLeft(f)));
     }
-    root.querySelector(`.link-handle[data-link="${id}"]`)?.setAttribute('transform', `translate(${x + W - 24},${y + H})`);
+    root.querySelectorAll(`.link-handle[data-link="${id}"]`).forEach((h) => h.setAttribute('transform', handleAt({ x, y }, h.dataset.kind)));
     root.querySelectorAll(`.edges [data-s="${id}"], .edges [data-t="${id}"]`).forEach((el) => {
       el.setAttribute('d', edgePath(pos.get(Number(el.dataset.s)), pos.get(Number(el.dataset.t))));
     });
@@ -456,14 +482,15 @@ export function render(view, openMenu = null) {
     const hit = e.target.closest('.edge-hit');
     drag = {
       id: node ? Number(node.dataset.node) : null, fold: fold ? Number(fold.dataset.fold) : null,
-      link: handle ? Number(handle.dataset.link) : null, hit, multi: e.ctrlKey || e.metaKey,
+      link: handle ? Number(handle.dataset.link) : null, linkKind: handle?.dataset.kind, hit, multi: e.ctrlKey || e.metaKey,
       sx: e.clientX, sy: e.clientY, cx: camera.x, cy: camera.y, moved: false,
     };
     if (drag.link != null) {
-      // Draw a blocker link: an orange arrow follows the pointer until it is dropped on a card.
+      // Draw a link: an orange arrow (blocker) or a blue dotted line (related) follows the pointer until it is dropped on a card.
       capture(e);
-      svg.classList.add('linking');
-      root.querySelector('.edges').insertAdjacentHTML('beforeend', '<path class="edge dep temp" marker-end="url(#arrow)"/>');
+      svg.classList.add('linking', `linking-${drag.linkKind}`);
+      root.querySelector('.edges').insertAdjacentHTML('beforeend', drag.linkKind === 'rel'
+        ? '<path class="edge rel temp"/>' : '<path class="edge dep temp" marker-end="url(#arrow)"/>');
     }
   });
   const linkTarget = (e) => {
@@ -530,11 +557,12 @@ export function render(view, openMenu = null) {
     if (drag?.link != null) {
       const target = linkTarget(e);
       const from = drag.link;
+      const add = drag.linkKind === 'rel' ? addRelated : addBlocker;
       drag = null;
-      svg.classList.remove('linking');
+      svg.classList.remove('linking', 'linking-rel', 'linking-dep');
       root.querySelector('.temp')?.remove();
       root.querySelectorAll('.link-target').forEach((el) => el.classList.remove('link-target'));
-      if (target) addBlocker(from, Number(target.dataset.node));
+      if (target) add(from, Number(target.dataset.node));
       return;
     }
     const click = drag && !drag.moved ? drag : null;
@@ -572,7 +600,7 @@ export function render(view, openMenu = null) {
     root.querySelectorAll('.moving').forEach((el) => el.classList.remove('moving'));
     root.querySelector('.ghosts').innerHTML = '';
     drag = null;
-    svg.classList.remove('panning', 'linking');
+    svg.classList.remove('panning', 'linking', 'linking-rel', 'linking-dep');
     root.querySelector('.temp')?.remove();
   });
   // Scroll / two-finger swipe moves the canvas; Ctrl + scroll (and trackpad pinch) zooms.

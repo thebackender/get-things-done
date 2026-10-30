@@ -46,6 +46,7 @@ LIMITS = {
     "goal_number": 1_000_000,   # target and each progress entry, in units
     "progress_entries": 1000,   # per task: a few years of daily entries
     "depends_on": 50,           # "Blocked by" tasks per task
+    "related": 50,              # "Related" tasks per task
     "project_name": 40,         # shown as "Project:Subproject" in narrow chips
     "sprint_name": 60,
     "sprint_goal": 150,
@@ -67,6 +68,7 @@ TASK_DEFAULTS = {
     "project_id": None,
     "due": None,
     "depends_on": [],
+    "related": [],      # tasks linked to this one without blocking or nesting; kept on both tasks
     "sprint_id": None,
     "notes": "",
     "waiting_for": "",
@@ -268,6 +270,7 @@ def get_state():
         if view["parent_id"] not in task_ids:
             view["parent_id"] = None
         view["depends_on"] = [d for d in view["depends_on"] if d in task_ids]
+        view["related"] = [r for r in view["related"] if r in task_ids]
         shown.append(view)
     return {"tasks": shown, "sprints": sprints, "projects": projects,
             "history": data["history"], "can_undo": bool(undo_stack), "limits": LIMITS}
@@ -415,6 +418,10 @@ def clean_task(payload):
             value = as_int_list(value, "depends_on")
             if len(set(value)) > LIMITS["depends_on"]:
                 raise ApiError(f"A task can be blocked by at most {LIMITS['depends_on']} tasks")
+        elif key == "related":
+            value = as_int_list(value, "related")
+            if len(value) > LIMITS["related"]:
+                raise ApiError(f"A task can have at most {LIMITS['related']} related tasks")
         elif key == "target":
             if value in (None, ""):
                 value = None
@@ -532,6 +539,26 @@ def apply_blocking(data, task, payload):
             raise ApiError(f'"{other["title"]}" cannot both block this task and be blocked by it')
 
 
+def apply_related(data, task, before=None):
+    """"Related" goes both ways: keep the other side in step. Only links this request added or removed
+    are touched on other tasks, so links to soft-deleted tasks stay in the file."""
+    old = set(before["related"]) if before else set()
+    ids = {t["id"] for t in live(data["tasks"])}
+    # New links must point at live tasks; links the task already had are kept as they are.
+    task["related"] = [r for r in dict.fromkeys(task["related"]) if r != task["id"] and (r in ids or r in old)]
+    new = set(task["related"])
+    for other in live(data["tasks"]):
+        if other is task:
+            continue
+        has = task["id"] in other["related"]
+        if other["id"] in new - old and not has:
+            if len(other["related"]) >= LIMITS["related"]:
+                raise ApiError(f'"{other["title"]}" already has {LIMITS["related"]} related tasks')
+            other["related"].append(task["id"])
+        elif other["id"] in old - new and has:
+            other["related"].remove(task["id"])
+
+
 def goal_sum(task):
     return sum(entry["value"] for entry in task["progress"])
 
@@ -595,6 +622,7 @@ def create_task(data, payload):
     check_task_refs(data, task)
     check_sprint_priority(data, task)
     apply_blocking(data, task, payload)
+    apply_related(data, task)
     goal_reached = apply_goal(task)
     apply_done_at(task)
     log(data, task["id"], "created", None, task["title"])
@@ -611,6 +639,8 @@ def update_task(data, task_id, payload):
     check_task_refs(data, task, fields)
     check_sprint_priority(data, task, before)
     apply_blocking(data, task, payload)
+    if "related" in fields:
+        apply_related(data, task, before)
     # Mark done when this change reaches the goal; a goal already reached can still be reopened by hand.
     goal_reached = False
     if task["target"] != before["target"] or goal_sum(task) != goal_sum(before):
