@@ -1,7 +1,25 @@
 // Projects tab: projects and their subprojects (name, color, active).
 import { store, projectList, projectById, isSelectable, createProject, updateProject, deleteProject } from '../store.js';
-import { PALETTE, OTHER_COLOR, esc, empty, freshBox, paint } from '../util.js';
+import { PALETTE, OTHER_COLOR, esc, empty, freshBox, paint, toast } from '../util.js';
 import { icon } from '../icons.js';
+import { isDark } from '../theme.js';
+
+// Color picker: Coloris (web/vendor/coloris), loaded as a plain script. The palette colors are its quick swatches.
+function setupPicker(root) {
+  if (!window.Coloris) return;
+  window.Coloris({
+    el: '.color-input',
+    wrap: true,
+    themeMode: isDark() ? 'dark' : 'light',
+    format: 'hex',
+    alpha: false,
+    swatches: COLORS,
+    closeButton: true,
+    closeLabel: 'Done',
+    margin: 6,
+  });
+  window.Coloris.wrap('.color-input'); // fields drawn after start-up need wrapping too
+}
 
 const COLORS = [...PALETTE, OTHER_COLOR];
 const plural = (n) => `${n} task${n === 1 ? '' : 's'}`;
@@ -20,8 +38,8 @@ function projectRow(p) {
       <input type="checkbox" data-act="active" ${p.is_active ? 'checked' : ''}> active
     </label>
     ${hiddenByParent ? `<span class="muted">hidden: "${esc(parent.name)}" is inactive</span>` : ''}
-    <span class="swatches">${isSub ? '' : COLORS.map((c) =>
-      `<button type="button" class="swatch${c === p.color ? ' on' : ''}" style="--c:${paint(c)}" data-color="${c}" title="Use this color"></button>`).join('')}</span>
+    <span class="color-cell">${isSub ? '' : `<input class="color-input" value="${esc(p.color)}" data-act="color"
+      title="Project color: click to pick" aria-label="Color of ${esc(p.name)}" spellcheck="false" autocomplete="off">`}</span>
     <button type="button" data-act="rename">Rename</button>
     <button type="button" class="danger" data-act="delete">Delete</button>
   </li>`;
@@ -60,18 +78,27 @@ export function render(view) {
     createProject({ name, parent_id: parent ? Number(parent) : null });
   });
 
+  setupPicker(root);
+
   root.addEventListener('change', (e) => {
-    if (e.target.dataset.act !== 'active') return;
-    const id = Number(e.target.closest('[data-project]').dataset.project);
-    updateProject(id, { is_active: e.target.checked });
+    const act = e.target.dataset.act;
+    if (act !== 'active' && act !== 'color') return;
+    const p = projectById(Number(e.target.closest('[data-project]').dataset.project));
+    if (act === 'active') return updateProject(p.id, { is_active: e.target.checked });
+    // The picker fires change when it closes; typed values are checked here and by the server.
+    const color = e.target.value.trim().toLowerCase();
+    if (color === p.color) return;
+    if (!/^#[0-9a-f]{6}$/.test(color)) {
+      e.target.value = p.color;
+      return toast('Color must look like #1a2b3c', 'error');
+    }
+    updateProject(p.id, { color });
   });
 
   root.addEventListener('click', (e) => {
     const row = e.target.closest('[data-project]');
     if (!row) return;
     const p = projectById(Number(row.dataset.project));
-    const swatch = e.target.closest('.swatch');
-    if (swatch) return updateProject(p.id, { color: swatch.dataset.color });
     const act = e.target.closest('button[data-act]')?.dataset.act;
     if (act === 'rename') {
       const name = prompt('Rename project', p.name)?.trim();

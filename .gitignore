@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Personal planner data: tasks, settings, backups (and renamed copies like data12/). Never commit.
+/data*/

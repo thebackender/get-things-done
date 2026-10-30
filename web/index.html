@@ -14,6 +14,7 @@
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
     })();
   </script>
+  <link rel="stylesheet" href="vendor/coloris/coloris.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -44,6 +45,8 @@
   <dialog id="dialog"></dialog>
   <dialog id="confirm-dialog"></dialog>
   <div id="toast" role="status" aria-live="polite"></div>
+  <!-- Color picker for projects (sets window.Coloris) -->
+  <script src="vendor/coloris/coloris.min.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
