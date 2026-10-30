@@ -30,6 +30,7 @@ const LINE = {
   sun: [circle(12, 12, 4), 'M12 2v2M12 20v2m-7.07-17.07 1.41 1.41m11.32 11.32 1.41 1.41M2 12h2M20 12h2m-15.66 5.66-1.41 1.41M19.07 4.93l-1.41 1.41'],
   moon: ['M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z'],
   monitor: [rect(2, 3, 20, 14, 2), 'M8 21h8M12 17v4'],
+  sliders: ['M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4'],
 };
 const LINE_D = Object.fromEntries(Object.entries(LINE).map(([name, parts]) => [name, parts.join('')]));
 

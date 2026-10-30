@@ -16,13 +16,17 @@ The server listens on `127.0.0.1` only, so it isn't reachable from the network.
 
 | Tab | What it does |
 |---|---|
-| List | Task tree. Search, sort, group by project, status or sprint, show done tasks |
-| Sprint | Board for the active sprint: To do / In progress / Waiting / Done. Drag cards between columns |
+| Tasks | Task list on the left, calendar on the right; both show the same tasks. **Sprint** shows only the active sprint's tasks, with its dates, days left, progress and goal above the list; **All** shows everything. View: sort, group by project, status or sprint, show done tasks. Drag a task from the list onto a calendar day to set its due date |
 | Backlog | Tasks without a sprint. Drag a task into a sprint and its unfinished subtasks come along. Create, start and close sprints here |
-| Calendar | Both views start at the active sprint (at today if no sprint is active); the Sprint button brings you back. Year view: 12 months from the sprint's month, a dot marks days with tasks (red: overdue, orange: urgent); click a day to see its tasks. Month view: 5 weeks from the sprint's first week, or the whole sprint if it's longer; tasks on their due dates (up to 3 per day, "+N more" opens the rest), every other month tinted; drag a task to move its due date. Click an empty day to add a task |
 | Graph | Tasks as nodes. Solid line: subtask. Dashed arrow A ⇢ B: A blocks B |
 | Stats | Summary, done per week, sprint burndown, projects, priorities, velocity, goals |
 | Settings | Theme (light, dark, system). Projects and subprojects: create, rename, delete, pick a color, mark active or inactive |
+
+### Calendar
+
+The calendar starts at the active sprint (at today if no sprint is active); the Sprint button brings you back.
+Month view: 5 weeks from the sprint's first week (or the whole sprint if it's longer), square cells, up to 3 tasks per day ("+N more" opens the rest), every other month tinted. Drag a task to another day to move its due date.
+Year view: 12 months from the sprint's month; a dot marks days with tasks (red: overdue, orange: urgent), click a day to see its tasks. Click an empty day in either view to add a task.
 
 ## Keyboard shortcuts
 
@@ -73,8 +77,8 @@ Everywhere in the UI a task's project shows as `Project` or `Project:Subproject`
 
 ### UI settings
 
-`data/settings.json` keeps the theme and each tab's view options: sorting, grouping, "show done" and collapsed tasks in List,
-the year/month view and checkbox in Calendar, the checkboxes in Graph, the sprint picked on the board, the goal picked in Stats. The page saves it as you change things.
+`data/settings.json` keeps the theme and each tab's view options: the Sprint / All filter, sorting, grouping, "show done" and collapsed tasks in the list,
+the year/month view of the calendar, the checkboxes in Graph, the goal picked in Stats. The page saves it as you change things.
 It is separate from `planner.json`: no undo, no history, no backups. Delete it to reset everything to defaults.
 
 ```json
@@ -100,5 +104,5 @@ web/js/theme.js      light / dark theme
 web/js/store.js      state and API calls
 web/js/editor.js     task and sprint dialogs
 web/js/components.js cards, badges, drag and drop
-web/js/views/*.js    one file per tab (settings.js manages projects)
+web/js/views/*.js    one file per tab; tasks.js puts list.js and calendar.js side by side; settings.js manages projects
 ```

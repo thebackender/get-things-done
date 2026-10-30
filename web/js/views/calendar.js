@@ -1,4 +1,4 @@
-// Calendar tab. Both views start at the active sprint (at today when no sprint is active):
+// Calendar (right side of the Tasks tab). Both views start at the active sprint (at today when no sprint is active):
 // - year view: 12 mini months from the month the sprint starts in;
 // - month view: 5 weeks from the sprint's first week (more if the sprint is longer), with tasks on their due dates.
 import { store, activeSprint, isOverdue, projectColor, projectLabel, byPriority, taskById, updateTask } from '../store.js';
@@ -9,9 +9,11 @@ import { icon } from '../icons.js';
 import { getPrefs, setPrefs } from '../prefs.js';
 
 const MODES = { year: 'Year', month: 'Month' };
-const saved = getPrefs('calendar', { showDone: true, mode: 'year' });
-let showDone = saved.showDone;
-let mode = MODES[saved.mode] ? saved.mode : 'year';
+const saved = getPrefs('calendar', { mode: 'month' });
+let mode = MODES[saved.mode] ? saved.mode : 'month';
+// Which tasks to show: set by the Tasks tab to the list's Sprint / All filter. Done tasks always show (struck through).
+let taskFilter = () => true;
+export const setFilter = (fn) => { taskFilter = fn; };
 const YEAR_MONTHS = 12; // fills the 4×3 grid
 const MIN_WEEKS = 5;
 const MAX_WEEKS = 12; // a very long sprint still fits a sensible grid
@@ -41,7 +43,7 @@ function weekWindow(sprint) {
   }
   return { first, weeks, anchorMonday };
 }
-const persist = () => setPrefs('calendar', { showDone, mode });
+const persist = () => setPrefs('calendar', { mode });
 
 const short = (m) => MONTHS[m].slice(0, 3);
 const isWeekend = (d) => d.getDay() === 0 || d.getDay() === 6;
@@ -50,7 +52,7 @@ const inSprint = (sprint, iso) => !!(sprint?.start && sprint?.end && iso >= spri
 function tasksByDate() {
   const map = new Map();
   for (const t of store.tasks) {
-    if (!t.due || (!showDone && t.status === 'done')) continue;
+    if (!t.due || !taskFilter(t)) continue;
     if (!map.has(t.due)) map.set(t.due, []);
     map.get(t.due).push(t);
   }
@@ -173,7 +175,6 @@ export function render(view) {
   const sprint = activeSprint();
   const now = today();
   const byDate = tasksByDate();
-  const noDue = store.tasks.filter((t) => !t.due && t.status !== 'done').length;
   const unit = mode === 'year' ? `${YEAR_STEP} months` : `${WEEK_STEP} weeks`;
   const anchor = anchorDate(sprint);
   const firstMonth = new Date(anchor.getFullYear(), anchor.getMonth() + monthShift, 1);
@@ -197,7 +198,6 @@ export function render(view) {
       <div class="segmented" role="radiogroup" aria-label="Calendar view">
         ${Object.entries(MODES).map(([v, l]) => `<button type="button" role="radio" aria-checked="${mode === v}" class="${mode === v ? 'on' : ''}" data-mode="${v}">${l}</button>`).join('')}
       </div>
-      <label class="check"><input type="checkbox" class="show-done" ${showDone ? 'checked' : ''}> show done</label>
       <span class="spacer"></span>
       <span class="nav-group">
         <button class="icon" data-nav="-1" title="Previous ${unit}">${icon('chevronLeft')}</button>
@@ -206,10 +206,7 @@ export function render(view) {
       </span>
     </div>
     ${mode === 'year' ? yearView(firstMonth, byDate, sprint, now) : monthView(win, byDate, sprint, now)}
-    <div class="cal-foot">
-      ${sprint ? `<span class="legend-sprint"><i></i> ${esc(sprint.name)}</span>` : ''}
-      <span class="muted">No due date: ${noDue}</span>
-    </div>
+    ${sprint ? `<div class="cal-foot"><span class="legend-sprint"><i></i> ${esc(sprint.name)}</span></div>` : ''}
   </div>`;
 
   root.querySelector('.toolbar').addEventListener('click', (e) => {
@@ -232,11 +229,7 @@ export function render(view) {
     }
     render(view);
   });
-  root.querySelector('.show-done').addEventListener('change', (e) => {
-    showDone = e.target.checked;
-    persist();
-    render(view);
-  });
+
 
   if (mode === 'year') {
     root.addEventListener('click', (e) => {
@@ -256,6 +249,7 @@ export function render(view) {
       openDayPopover(root, day, items);
       day.classList.add('open');
     });
+    dragAndDrop(root, '.mini-day[data-date]', moveDue);
     return;
   }
 
@@ -268,7 +262,10 @@ export function render(view) {
     closePopover();
     openTaskEditor(null, { due: day.dataset.date });
   });
-  dragAndDrop(root, '.day', (id, zone) => {
-    if (taskById(id)?.due !== zone.dataset.date) updateTask(id, { due: zone.dataset.date });
-  });
+  dragAndDrop(root, '.day', moveDue);
+}
+
+/** Drop a task (from the list or the calendar itself) on a day: that day becomes its due date. */
+function moveDue(id, zone) {
+  if (taskById(id)?.due !== zone.dataset.date) updateTask(id, { due: zone.dataset.date });
 }

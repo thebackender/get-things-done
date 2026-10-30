@@ -358,28 +358,20 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
 }
 .drop.drag-over { outline: 2px dashed var(--subtle); outline-offset: 2px; background: var(--muted); }
 
-.sprint-head {
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-  margin-bottom: 16px; padding: 14px 16px;
+/* Sprint summary above the list (Sprint filter). */
+.sprint-line {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 12px; padding: 10px 14px;
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow-xs);
 }
-.sprint-info { flex: 1; min-width: 200px; }
+.sprint-info { flex: 1; min-width: 0; }
 .sprint-info .muted { font-size: 13px; }
-.sprint-goal { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: var(--muted-foreground); font-size: 13px; }
-.sprint-progress { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
-
-.board { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 16px; align-items: start; }
-.column { background: var(--muted); border-radius: var(--radius); padding: 10px; min-height: 260px; }
-.column h3 {
-  display: flex; align-items: center; gap: 8px; margin: 2px 4px 10px;
-  font-size: 13px; font-weight: 600;
-}
-.column h3 .count { margin-left: auto; }
-.column h3::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--subtle); }
-.col-doing h3::before { background: #3b82f6; }
-.col-waiting h3::before { background: #f59e0b; }
-.col-done h3::before { background: #22c55e; }
+.sprint-info .overdue { color: var(--destructive); }
+.sprint-goal { display: flex; align-items: center; gap: 6px; margin-top: 2px; color: var(--muted-foreground); font-size: 13px; }
+.sprint-line .track.wide { width: 72px; }
+.sprint-info .muted { white-space: nowrap; }
+.badge.icon-only { padding: 0 5px; }
+.sprint-progress { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
 
 .backlog-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
 .pane { background: var(--muted); border-radius: var(--radius); padding: 14px; min-height: 300px; }
@@ -405,7 +397,7 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
   overflow: hidden; box-shadow: var(--shadow-xs);
 }
 .dow { background: var(--surface-2); padding: 8px 10px; font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
-/* Square cells with up to 3 tasks; see .cal-wrap.month for the size. */
+/* Square cells with up to 3 tasks; the pane width sets their size. */
 .day {
   aspect-ratio: 1; min-width: 0; padding: 4px 5px;
   background: var(--card); cursor: pointer; overflow: hidden;
@@ -436,19 +428,46 @@ button.more:hover:not(:disabled) { background: var(--accent); color: var(--foreg
 .overdue-icon { margin-right: 3px; vertical-align: -2px; }
 .legend-sprint { display: inline-flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 13px; }
 .legend-sprint i { width: 18px; height: 2px; background: var(--sprint); display: inline-block; }
-.view-calendar { position: relative; } /* anchor for the day popover */
-/* Month view: square cells. The width follows the window height, so every week fits without scrolling. */
-.cal-wrap.month { max-width: clamp(630px, calc((100vh - 270px) / var(--weeks, 5) * 7), 1000px); }
-.cal-heading { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+.cal-heading { margin: 0 !important; font-size: 16px; font-weight: 600; white-space: nowrap; }
 .nav-group { display: inline-flex; align-items: center; gap: 4px; }
 /* The year view marks sprint days with a gray band, not a blue line. */
 .cal-wrap.year .legend-sprint i { width: 16px; height: 10px; border-radius: 2px; background: var(--muted); }
 .cal-foot { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 13px; }
 
+/* Tasks tab: list on the left, calendar on the right. The calendar width follows the window height so a
+   5-week month of square cells fits on screen; it sticks while the list scrolls. */
+.tasks-layout {
+  --cal-w: clamp(400px, calc((100vh - 260px) / 5 * 7), 620px);
+  display: grid; grid-template-columns: minmax(0, 1fr) var(--cal-w); gap: 24px; align-items: start;
+}
+.cal-pane { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow: auto; }
+.cal-pane .toolbar { flex-wrap: nowrap; margin-bottom: 12px; }
+.list-toolbar { margin-bottom: 12px; }
+.list-toolbar .q { flex: 1; min-width: 160px !important; }
+.row[draggable] { -webkit-user-drag: element; }
+.row.dragging { opacity: 0.5; }
+
+/* View menu: sorting, grouping, done tasks. */
+.view-menu { position: relative; }
+.view-menu summary {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px;
+  border: 1px solid var(--input); border-radius: var(--radius-sm); background: var(--background);
+  font-size: 14px; font-weight: 500; cursor: pointer; list-style: none; box-shadow: var(--shadow-xs);
+}
+.view-menu summary::-webkit-details-marker { display: none; }
+.view-menu summary:hover, .view-menu[open] summary { background: var(--accent); }
+.view-menu .menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 25;
+  display: flex; flex-direction: column; gap: 10px; min-width: 230px; padding: 12px;
+  background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+}
+.view-menu .menu label:not(.check) { justify-content: space-between; }
+.view-menu .menu select { width: 140px; }
+
 /* Year view: twelve mini months, Apple Calendar style. */
 .year-grid {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px 48px;
-  padding: 18px 28px 22px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px 24px;
+  padding: 14px 18px 18px;
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-xs);
 }
 button.mini-title {
@@ -718,12 +737,13 @@ dialog::backdrop { background: var(--overlay); }
 #toast.show { opacity: 1; transform: translateY(0); }
 #toast.error { background: var(--destructive-bg); border-color: var(--destructive-border); color: var(--destructive); }
 
-@media (max-width: 1150px) { .year-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 32px; } }
+@media (max-width: 1100px) {
+  .tasks-layout { grid-template-columns: minmax(0, 1fr); }
+  .cal-pane { position: static; max-height: none; }
+}
 @media (max-width: 900px) {
-  .year-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px; gap: 20px 24px; }
   .topbar { height: auto; padding: 10px 16px; flex-wrap: wrap; }
   main { padding: 16px; }
-  .board { grid-template-columns: 1fr 1fr; }
   .backlog-layout { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: 1fr; }
   .editor .grid { grid-template-columns: 1fr; }

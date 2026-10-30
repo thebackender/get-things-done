@@ -3,20 +3,21 @@ import { store, reload, subscribe, undo } from './store.js';
 import { openTaskEditor } from './editor.js';
 import { esc } from './util.js';
 import { toggleTheme } from './theme.js';
-import * as list from './views/list.js';
-import * as board from './views/board.js';
+import * as tasks from './views/tasks.js';
 import * as backlog from './views/backlog.js';
-import * as calendar from './views/calendar.js';
 import * as graph from './views/graph.js';
 import * as stats from './views/stats.js';
 import * as settings from './views/settings.js';
 
-const VIEWS = { list, board, backlog, calendar, graph, stats, settings };
+const VIEWS = { list: tasks, backlog, graph, stats, settings };
+// Tabs that were merged into Tasks, so old links still work.
+const ALIASES = { board: 'list', calendar: 'list' };
 const main = document.getElementById('view');
 const undoBtn = document.getElementById('undo-btn');
 
 function route() {
-  const name = VIEWS[location.hash.slice(1)] ? location.hash.slice(1) : 'list';
+  const hash = location.hash.slice(1);
+  const name = VIEWS[hash] ? hash : ALIASES[hash] ?? 'list';
   document.querySelectorAll('#tabs a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === `#${name}`));
   // A fresh container each time, so the old view's event listeners go away with it.
   const root = document.createElement('div');
