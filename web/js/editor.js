@@ -1,7 +1,7 @@
 // Modal dialogs: task editor and sprint editor (one shared <dialog>).
 import {
   store, taskById, childrenOf, descendants, projectList, projectLabel, isSelectable, createProject, sprintById, sprintOrder, sprintPhase,
-  createTask, updateTask, deleteTask, createSprint, updateSprint, deleteSprint,
+  createTask, updateTask, deleteTask, createSprint, updateSprint, deleteSprint, maxlength, maxNumber,
 } from './store.js';
 import {
   PRIORITIES, STATUSES, esc, opt, prioIcon, today, addDays, fmtDate, fmtTs, fmtNum, statusName, prioName, toast,
@@ -131,7 +131,7 @@ export function openTaskEditor(task = null, preset = {}) {
       <h2>${isNew ? (t.parent_id ? 'New subtask' : 'New task') : `Task #${t.id}`}</h2>
       <button type="button" class="icon" data-act="close" title="Close (Esc)">${icon('x')}</button>
     </header>
-    <input name="title" class="title-input" placeholder="What needs to be done?" value="${esc(t.title)}" autocomplete="off" autofocus>
+    <input name="title" class="title-input" placeholder="What needs to be done?" value="${esc(t.title)}" autocomplete="off" autofocus ${maxlength('task_title')}>
     <div class="grid">
       <label>Status<select name="status">${STATUSES.map((s) => opt(s.value, s.name, t.status)).join('')}</select></label>
       <div class="field">Priority${pickerHTML('priority', PRIORITIES.map((p) => ({ value: p.value, label: p.name, icon: prioIcon(p.value) })), t.priority, 'Priority')}</div>
@@ -142,7 +142,7 @@ export function openTaskEditor(task = null, preset = {}) {
           <option value="${NEW_PROJECT}">+ New project…</option>
         </select>
         <span class="inline-new" hidden>
-          <input class="new-project" placeholder="Project or Project:Subproject" autocomplete="off">
+          <input class="new-project" placeholder="Project or Project:Subproject" autocomplete="off" ${maxlength('project_name', 2)}>
           <button type="button" data-act="add-project">Add</button>
           <button type="button" class="icon" data-act="cancel-project" title="Cancel">${icon('x')}</button>
         </span>
@@ -151,15 +151,15 @@ export function openTaskEditor(task = null, preset = {}) {
       <div class="field">Parent${comboHTML('parent_id', parents.map((p) => ({ value: p.id, label: p.title, hint: projectLabel(p.project_id) })), t.parent_id, { placeholder: '— none — (type to search)' })}</div>
       <label>Sprint<select name="sprint_id"><option value="">Backlog</option>${sprints.map((s) => opt(s.id, s.name + ({ current: ' (current)', past: ' (ended)' }[sprintPhase(s)] ?? ''), t.sprint_id)).join('')}</select></label>
     </div>
-    <label class="waiting-row" ${t.status === 'waiting' ? '' : 'hidden'}>Waiting for<input name="waiting_for" value="${esc(t.waiting_for)}" placeholder="e.g. reply from the visa office"></label>
-    <label>Notes<textarea name="notes" rows="4">${esc(t.notes)}</textarea></label>
+    <label class="waiting-row" ${t.status === 'waiting' ? '' : 'hidden'}>Waiting for<input name="waiting_for" value="${esc(t.waiting_for)}" placeholder="e.g. reply from the visa office" ${maxlength('waiting_for')}></label>
+    <label>Notes<textarea name="notes" rows="4" ${maxlength('task_notes')}>${esc(t.notes)}</textarea></label>
 
     <fieldset class="goal">
       <label class="check"><input type="checkbox" name="is_goal" ${isGoal ? 'checked' : ''}> Measurable goal (hours, pages, km…)</label>
       <div class="goal-body" ${isGoal ? '' : 'hidden'}>
         <div class="grid">
-          <label>Target<input type="number" name="target" min="0" step="any" value="${t.target ?? ''}"></label>
-          <label>Unit<input name="unit" value="${esc(t.unit)}" placeholder="h"></label>
+          <label>Target<input type="number" name="target" min="0" step="any" value="${t.target ?? ''}" ${maxNumber('goal_number')}></label>
+          <label>Unit<input name="unit" value="${esc(t.unit)}" placeholder="h" ${maxlength('unit')}></label>
         </div>
         <div class="progress-box"></div>
       </div>
@@ -200,7 +200,7 @@ export function openTaskEditor(task = null, preset = {}) {
       <div class="goal-summary"><span class="track wide"><span class="fill" style="width:${pct}%"></span></span>
         <b>${fmtNum(sum)}</b> / ${fmtNum(target)} ${unit}</div>
       <div class="progress-add">
-        <input type="number" step="any" class="pv" placeholder="+ amount">
+        <input type="number" step="any" class="pv" placeholder="+ amount" ${maxNumber('goal_number')}>
         ${dateInput('', today(), 'class="pd"')}
         <button type="button" data-act="add-progress">Add</button>
       </div>
@@ -380,7 +380,7 @@ export function openTaskEditor(task = null, preset = {}) {
   initial = snapshot(); // after everything is rendered, so the starting state counts as "no changes"
 }
 
-const goalRow = (g) => `<div class="sgoal-row">${icon('target', 14)}<input name="goal" value="${esc(g)}" placeholder="Add a goal…" autocomplete="off">
+const goalRow = (g) => `<div class="sgoal-row">${icon('target', 14)}<input name="goal" value="${esc(g)}" placeholder="Add a goal…" autocomplete="off" ${maxlength('sprint_goal')}>
   <button type="button" class="icon" data-act="remove-goal" title="Remove goal">${icon('x', 14)}</button></div>`;
 
 /** Open the sprint editor. sprint = null creates a new sprint. */
@@ -398,7 +398,7 @@ export function openSprintEditor(sprint = null) {
   dlg.innerHTML = `
   <form class="editor narrow" novalidate>
     <header><h2>${isNew ? 'New sprint' : 'Sprint'}</h2><button type="button" class="icon" data-act="close">${icon('x')}</button></header>
-    <label>Name<input name="name" value="${esc(s.name)}" autocomplete="off"></label>
+    <label>Name<input name="name" value="${esc(s.name)}" autocomplete="off" ${maxlength('sprint_name')}></label>
     <div class="grid">
       <label>Start${dateInput('start', s.start)}</label>
       <label>End${dateInput('end', s.end)}</label>
@@ -435,19 +435,21 @@ export function openSprintEditor(sprint = null) {
   };
   // Goals: one input per goal; there is always an empty one at the end to type the next goal into.
   const goalsBox = form.querySelector('.goals-edit');
+  const roomForGoal = () => goalsBox.children.length < (store.limits.sprint_goals ?? Infinity);
   const addGoalRow = () => {
     goalsBox.insertAdjacentHTML('beforeend', goalRow(''));
     goalsBox.lastElementChild.querySelector('input').focus();
   };
   goalsBox.addEventListener('input', (e) => {
-    if (e.target === goalsBox.lastElementChild?.querySelector('input') && e.target.value.trim()) goalsBox.insertAdjacentHTML('beforeend', goalRow(''));
+    if (e.target === goalsBox.lastElementChild?.querySelector('input') && e.target.value.trim() && roomForGoal()) goalsBox.insertAdjacentHTML('beforeend', goalRow(''));
   });
   goalsBox.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || e.target.name !== 'goal') return;
     e.preventDefault(); // Enter goes to the next goal instead of saving
     const next = e.target.closest('.sgoal-row').nextElementSibling?.querySelector('input');
     if (next) next.focus();
-    else if (e.target.value.trim()) addGoalRow();
+    else if (e.target.value.trim() && roomForGoal()) addGoalRow();
+    else if (e.target.value.trim()) toast(`A sprint can have at most ${store.limits.sprint_goals} goals`);
   });
   form.onclick = (e) => {
     const act = e.target.closest('[data-act]')?.dataset.act;

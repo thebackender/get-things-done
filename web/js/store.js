@@ -2,7 +2,7 @@
 import * as api from './api.js';
 import { OTHER_COLOR, paint, today, toast } from './util.js';
 
-export const store = { tasks: [], sprints: [], projects: [], history: [], canUndo: false };
+export const store = { tasks: [], sprints: [], projects: [], history: [], canUndo: false, limits: {} };
 
 const listeners = new Set();
 export const subscribe = (fn) => listeners.add(fn);
@@ -19,6 +19,7 @@ export async function reload() {
   store.projects = state.projects;
   store.history = state.history;
   store.canUndo = state.can_undo;
+  store.limits = state.limits ?? {};
   byId = new Map(store.tasks.map((t) => [t.id, t]));
   kids = new Map();
   for (const t of store.tasks) {
@@ -35,6 +36,11 @@ export async function reload() {
 }
 
 // ---------- queries ----------
+
+/** maxlength="…" for a text field, from the server's limits (see LIMITS in server.py). */
+export const maxlength = (key, times = 1) => (store.limits[key] ? `maxlength="${store.limits[key] * times + times - 1}"` : '');
+/** max="…" for a number field. */
+export const maxNumber = (key) => (store.limits[key] ? `max="${store.limits[key]}"` : '');
 
 export const taskById = (id) => byId.get(id);
 export const childrenOf = (id) => kids.get(id) || [];

@@ -100,6 +100,24 @@ It is separate from `planner.json`: no undo, no history, no backups. Delete it t
 
 `theme` is `light`, `dark` or `system` (follows the OS, the default). The ☾/☀ button in the header switches between light and dark; to go back to `system`, set it here or delete the key.
 
+### Limits
+
+The server checks these on every change; the UI stops typing at the same length (it reads them from `/api/state`). Change them in `LIMITS` in `server.py`.
+
+| What | Limit |
+|---|---|
+| Task title | 200 characters |
+| Notes | 10 000 characters |
+| Waiting for | 100 characters |
+| Goal unit | 15 characters |
+| Goal target, one progress entry | up to 1 000 000 |
+| Progress entries per goal | 1000 |
+| "Blocked by" tasks per task | 50 |
+| Project / subproject name | 40 characters |
+| Sprint name | 60 characters |
+| Sprint goals | 10 per sprint, 150 characters each |
+| One API request | 1 MB |
+
 ## Layout
 
 ```

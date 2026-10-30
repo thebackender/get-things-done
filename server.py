@@ -32,7 +32,22 @@ THEMES = ("light", "dark", "system")
 SETTINGS_MAX_BYTES = 64 * 1024
 
 TASK_STATUSES = ("todo", "doing", "waiting", "done")
-MAX_SPRINT_GOALS = 20
+# Limits for what you type (characters, counts, numbers). The UI gets them from /api/state and stops typing there,
+# so the server's errors only show up for hand-made requests. Stored data longer than this still loads.
+LIMITS = {
+    "task_title": 200,          # Jira / Microsoft To Do: 255, Todoist: 500; a next action reads best when short
+    "task_notes": 10_000,       # Todoist description: 16k, Jira: 32k
+    "waiting_for": 100,
+    "unit": 15,                 # "km", "pages", "hours"
+    "goal_number": 1_000_000,   # target and each progress entry, in units
+    "progress_entries": 1000,   # per task: a few years of daily entries
+    "depends_on": 50,           # "Blocked by" tasks per task
+    "project_name": 40,         # shown as "Project:Subproject" in narrow chips
+    "sprint_name": 60,
+    "sprint_goal": 150,
+    "sprint_goals": 10,
+}
+MAX_BODY_BYTES = 1024 * 1024  # one API request
 TRACKED_FIELDS = ("status", "sprint_id", "priority", "due")
 
 TASK_DEFAULTS = {
@@ -246,7 +261,7 @@ def get_state():
         view["depends_on"] = [d for d in view["depends_on"] if d in task_ids]
         shown.append(view)
     return {"tasks": shown, "sprints": sprints, "projects": projects,
-            "history": data["history"], "can_undo": bool(undo_stack)}
+            "history": data["history"], "can_undo": bool(undo_stack), "limits": LIMITS}
 
 
 def undo():
@@ -326,16 +341,30 @@ def as_int_list(value, field):
     return out
 
 
+def check_len(value, limit, label):
+    if len(value) > LIMITS[limit]:
+        raise ApiError(f"{label} is too long: {len(value)} characters, at most {LIMITS[limit]}")
+    return value
+
+
+def check_amount(value, label):
+    if abs(value) > LIMITS["goal_number"]:
+        raise ApiError(f"{label} must be at most {LIMITS['goal_number']:,}".replace(",", " "))
+    return value
+
+
 def clean_progress(value):
     if value in (None, ""):
         return []
     if not isinstance(value, list):
         raise ApiError("progress: expected a list")
+    if len(value) > LIMITS["progress_entries"]:
+        raise ApiError(f"A goal can have at most {LIMITS['progress_entries']} progress entries")
     out = []
     for entry in value:
         if not isinstance(entry, dict):
             raise ApiError("progress: each entry must be an object {date, value}")
-        amount = as_number(entry.get("value"), "progress.value")
+        amount = check_amount(as_number(entry.get("value"), "progress.value"), "A progress entry")
         if amount == 0:
             continue
         out.append({"date": as_date(entry.get("date"), "progress.date") or today(), "value": amount})
@@ -352,10 +381,13 @@ def clean_task(payload):
             value = as_str(value).strip()
             if not value:
                 raise ApiError("Title cannot be empty")
-        elif key in ("unit", "waiting_for"):
-            value = as_str(value).strip()
+            check_len(value, "task_title", "Title")
+        elif key == "unit":
+            value = check_len(as_str(value).strip(), "unit", "Unit")
+        elif key == "waiting_for":
+            value = check_len(as_str(value).strip(), "waiting_for", '"Waiting for"')
         elif key == "notes":
-            value = as_str(value)
+            value = check_len(as_str(value), "task_notes", "Notes")
         elif key == "status":
             if value not in TASK_STATUSES:
                 raise ApiError(f"Unknown status: {value}")
@@ -369,6 +401,8 @@ def clean_task(payload):
             value = as_date(value, "due")
         elif key == "depends_on":
             value = as_int_list(value, "depends_on")
+            if len(set(value)) > LIMITS["depends_on"]:
+                raise ApiError(f"A task can be blocked by at most {LIMITS['depends_on']} tasks")
         elif key == "target":
             if value in (None, ""):
                 value = None
@@ -376,6 +410,7 @@ def clean_task(payload):
                 value = as_number(value, "target")
                 if value <= 0:
                     raise ApiError("Target must be greater than zero")
+                check_amount(value, "Target")
         elif key == "progress":
             value = clean_progress(value)
         out[key] = value
@@ -391,12 +426,13 @@ def clean_sprint(payload):
             value = as_str(value).strip()
             if not value:
                 raise ApiError("Sprint name cannot be empty")
+            check_len(value, "sprint_name", "Sprint name")
         elif key == "goals":
             if not isinstance(value, list):
                 raise ApiError("goals must be a list")
-            value = [g for g in (as_str(item).strip() for item in value) if g]
-            if len(value) > MAX_SPRINT_GOALS:
-                raise ApiError(f"A sprint can have at most {MAX_SPRINT_GOALS} goals")
+            value = [check_len(g, "sprint_goal", "A sprint goal") for g in (as_str(item).strip() for item in value) if g]
+            if len(value) > LIMITS["sprint_goals"]:
+                raise ApiError(f"A sprint can have at most {LIMITS['sprint_goals']} goals")
         elif key in ("start", "end"):
             value = as_date(value, key)
         out[key] = value
@@ -570,7 +606,9 @@ def add_progress(data, task_id, payload):
     task = find(data["tasks"], task_id)
     if task["target"] is None:
         raise ApiError("This is not a measurable goal: set a target first")
-    amount = as_number(payload.get("value"), "value")
+    amount = check_amount(as_number(payload.get("value"), "value"), "A progress entry")
+    if len(task["progress"]) >= LIMITS["progress_entries"]:
+        raise ApiError(f"A goal can have at most {LIMITS['progress_entries']} progress entries")
     if amount == 0:
         raise ApiError("Value cannot be zero")
     before = copy.deepcopy(task)
@@ -637,7 +675,7 @@ def clean_project_name(value):
         raise ApiError("Project name cannot be empty")
     if ":" in name:
         raise ApiError('Project name cannot contain ":" (it separates project and subproject)')
-    return name
+    return check_len(name, "project_name", "Project name")
 
 
 def sibling_named(data, name, parent_id, exclude=None):
@@ -774,6 +812,9 @@ class Handler(SimpleHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         if not length:
             return {}
+        if length > MAX_BODY_BYTES:
+            self.close_connection = True  # the body is left unread
+            raise ApiError(f"Request is too large (at most {MAX_BODY_BYTES // 1024} KB)", 413)
         try:
             body = json.loads(self.rfile.read(length))
         except (json.JSONDecodeError, UnicodeDecodeError):

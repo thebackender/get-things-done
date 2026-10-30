@@ -1,5 +1,5 @@
 // Projects tab: projects and their subprojects (name, color, active).
-import { store, projectList, projectById, isSelectable, createProject, updateProject, deleteProject } from '../store.js';
+import { store, projectList, projectById, isSelectable, createProject, updateProject, deleteProject, maxlength } from '../store.js';
 import { PALETTE, OTHER_COLOR, esc, empty, freshBox, paint, toast } from '../util.js';
 import { icon } from '../icons.js';
 import { isDark } from '../theme.js';
@@ -59,7 +59,7 @@ export function render(view) {
           Inactive projects are hidden from the editor's dropdown; their tasks keep them.
         </p>
         <form class="add-row">
-          <input name="name" placeholder="New project name" autocomplete="off">
+          <input name="name" placeholder="New project name" autocomplete="off" ${maxlength('project_name')}>
           <select name="parent_id" title="Where to add it">
             <option value="">as a top-level project</option>
             ${roots.map((p) => `<option value="${p.id}">as a subproject of ${esc(p.name)}</option>`).join('')}
@@ -102,6 +102,8 @@ export function render(view) {
     const act = e.target.closest('button[data-act]')?.dataset.act;
     if (act === 'rename') {
       const name = prompt('Rename project', p.name)?.trim();
+      const max = store.limits.project_name;
+      if (name && max && name.length > max) return toast(`Project name is too long: ${name.length} characters, at most ${max}`, 'error');
       if (name && name !== p.name) updateProject(p.id, { name });
     }
     if (act === 'delete') {
