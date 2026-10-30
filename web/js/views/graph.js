@@ -2,11 +2,12 @@
 // Hand-written force layout (Fruchterman–Reingold) in SVG, no libraries.
 import { store, taskById, projectById, projectList, projectColor } from '../store.js';
 import { openTaskEditor } from '../editor.js';
-import { esc, trunc, empty, freshBox, OTHER_COLOR } from '../util.js';
+import { esc, trunc, empty, freshBox, paint, OTHER_COLOR } from '../util.js';
+import { getPrefs, setPrefs } from '../prefs.js';
 
 const K = 120; // preferred distance between linked nodes
 const pos = new Map(); // id -> {x, y}; kept across re-renders so the graph doesn't jump
-const opts = { showDone: false, onlyLinked: true };
+const opts = getPrefs('graph', { showDone: false, onlyLinked: true });
 let camera = null; // {x, y, k}: pan and zoom
 
 const radius = (t) => 7 + Math.max(0, t.priority) * 3;
@@ -93,7 +94,7 @@ export function render(view) {
       </svg>
       ${nodes.length ? '' : empty('No links yet. Set a parent, "Blocked by" or "Blocking" in the task editor, or uncheck "linked only".')}
       ${usedRoots.length || hasNoProject ? `<div class="cat-legend">
-        ${usedRoots.map((p) => `<span><i class="dot" style="--c:${p.color}"></i>${esc(p.name)}</span>`).join('')}
+        ${usedRoots.map((p) => `<span><i class="dot" style="--c:${paint(p.color)}"></i>${esc(p.name)}</span>`).join('')}
         ${hasNoProject ? `<span><i class="dot" style="--c:${OTHER_COLOR}"></i>no project</span>` : ''}
       </div>` : ''}
     </div>`;
@@ -200,6 +201,7 @@ export function render(view) {
     const key = e.target.dataset.opt;
     if (!key) return;
     opts[key] = e.target.checked;
+    setPrefs('graph', { showDone: opts.showDone, onlyLinked: opts.onlyLinked });
     render(view);
   });
   root.querySelector('.toolbar').addEventListener('click', (e) => {

@@ -4,9 +4,10 @@ import { openTaskEditor } from '../editor.js';
 import { cardClicks, dragAndDrop } from '../components.js';
 import { MONTHS, WEEKDAYS, esc, isoDate, today, prioClass, prioIcon, freshBox } from '../util.js';
 import { icon } from '../icons.js';
+import { getPrefs, setPrefs } from '../prefs.js';
 
 let cursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-let showDone = true;
+let { showDone } = getPrefs('calendar', { showDone: true });
 
 function chip(t) {
   const overdue = isOverdue(t);
@@ -73,6 +74,7 @@ export function render(view) {
   });
   root.querySelector('.show-done').addEventListener('change', (e) => {
     showDone = e.target.checked;
+    setPrefs('calendar', { showDone });
     render(view);
   });
   cardClicks(root);

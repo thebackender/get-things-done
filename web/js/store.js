@@ -1,6 +1,6 @@
 // App state: data from the server, lookup indexes, and all changes via the API.
 import * as api from './api.js';
-import { OTHER_COLOR, today, toast } from './util.js';
+import { OTHER_COLOR, paint, today, toast } from './util.js';
 
 export const store = { tasks: [], sprints: [], projects: [], history: [], canUndo: false };
 
@@ -73,8 +73,8 @@ export function projectLabel(id) {
   const root = rootOf(p);
   return root === p ? p.name : `${root.name}:${p.name}`;
 }
-/** Subprojects use their top-level project's color. */
-export const projectColor = (id) => rootOf(projectsById.get(id))?.color ?? OTHER_COLOR;
+/** Subprojects use their top-level project's color (adjusted for the current theme). */
+export const projectColor = (id) => paint(rootOf(projectsById.get(id))?.color ?? OTHER_COLOR);
 /** Shown in the task editor dropdown: active, and for subprojects the parent is active too. */
 export function isSelectable(p) {
   const root = rootOf(p);

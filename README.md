@@ -22,7 +22,7 @@ The server listens on `127.0.0.1` only, so it isn't reachable from the network.
 | Calendar | Tasks on their due dates. Click a day to add a task, drag a task to move its due date |
 | Graph | Tasks as nodes. Solid line: subtask. Dashed arrow A ⇢ B: A blocks B |
 | Stats | Summary, done per week, sprint burndown, projects, priorities, velocity, goals |
-| Settings | Projects and subprojects: create, rename, delete, pick a color, mark active or inactive |
+| Settings | Theme (light, dark, system). Projects and subprojects: create, rename, delete, pick a color, mark active or inactive |
 
 ## Keyboard shortcuts
 
@@ -71,14 +71,32 @@ Everywhere in the UI a task's project shows as `Project` or `Project:Subproject`
 
 `history` records changes to status, sprint, priority, due date and progress (last 5000 entries). Burndown and cycle time are computed from it.
 
+### UI settings
+
+`data/settings.json` keeps the theme and each tab's view options: sorting, grouping, "show done" and collapsed tasks in List,
+the checkboxes in Calendar and Graph, the sprint picked on the board, the goal picked in Stats. The page saves it as you change things.
+It is separate from `planner.json`: no undo, no history, no backups. Delete it to reset everything to defaults.
+
+```json
+{
+  "theme": "dark",
+  "list": { "sort": "priority", "group": "project", "showDone": false, "collapsed": [12] },
+  "graph": { "showDone": false, "onlyLinked": true }
+}
+```
+
+`theme` is `light`, `dark` or `system` (follows the OS). The ☾/☀ button in the header switches between light and dark.
+
 ## Layout
 
 ```
 server.py            HTTP server and API
-data/                data and backups
+data/                data, UI settings and backups
 web/index.html       page
 web/style.css        styles
 web/js/app.js        tabs and keyboard shortcuts
+web/js/prefs.js      UI settings (data/settings.json)
+web/js/theme.js      light / dark theme
 web/js/store.js      state and API calls
 web/js/editor.js     task and sprint dialogs
 web/js/components.js cards, badges, drag and drop

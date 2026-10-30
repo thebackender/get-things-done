@@ -1,9 +1,11 @@
-// Settings tab: manage projects and their subprojects (name, color, active).
+// Settings tab: theme, and projects with their subprojects (name, color, active).
 import { store, projectList, projectById, isSelectable, createProject, updateProject, deleteProject } from '../store.js';
-import { PALETTE, OTHER_COLOR, esc, empty, freshBox } from '../util.js';
+import { PALETTE, OTHER_COLOR, esc, empty, freshBox, paint } from '../util.js';
 import { icon } from '../icons.js';
+import { THEMES, themeMode, setTheme } from '../theme.js';
 
 const COLORS = [...PALETTE, OTHER_COLOR];
+const THEME_ICONS = { light: 'sun', dark: 'moon', system: 'monitor' };
 const plural = (n) => `${n} task${n === 1 ? '' : 's'}`;
 const subprojectsOf = (id) => store.projects.filter((p) => p.parent_id === id);
 const taskCount = (id) => store.tasks.filter((t) => t.project_id === id).length;
@@ -14,14 +16,14 @@ function projectRow(p) {
   const n = taskCount(p.id) + (isSub ? 0 : subprojectsOf(p.id).reduce((s, c) => s + taskCount(c.id), 0));
   const hiddenByParent = isSub && p.is_active && !isSelectable(p);
   return `<li class="${isSub ? 'sub' : 'root'}${isSelectable(p) ? '' : ' inactive'}" data-project="${p.id}">
-    <span class="name">${isSub ? icon('cornerDownRight', 14, 'muted') : `<i class="dot" style="--c:${p.color}"></i>`}${esc(p.name)}</span>
+    <span class="name">${isSub ? icon('cornerDownRight', 14, 'muted') : `<i class="dot" style="--c:${paint(p.color)}"></i>`}${esc(p.name)}</span>
     <span class="muted">${plural(n)}</span>
     <label class="check" title="Inactive projects are hidden from the task editor's dropdown">
       <input type="checkbox" data-act="active" ${p.is_active ? 'checked' : ''}> active
     </label>
     ${hiddenByParent ? `<span class="muted">hidden: "${esc(parent.name)}" is inactive</span>` : ''}
     <span class="swatches">${isSub ? '' : COLORS.map((c) =>
-      `<button type="button" class="swatch${c === p.color ? ' on' : ''}" style="--c:${c}" data-color="${c}" title="Use this color"></button>`).join('')}</span>
+      `<button type="button" class="swatch${c === p.color ? ' on' : ''}" style="--c:${paint(c)}" data-color="${c}" title="Use this color"></button>`).join('')}</span>
     <button type="button" data-act="rename">Rename</button>
     <button type="button" class="danger" data-act="delete">Delete</button>
   </li>`;
@@ -33,6 +35,14 @@ export function render(view) {
   const roots = list.filter((p) => p.parent_id == null);
   root.innerHTML = `
     <div class="settings">
+      <section class="settings-card">
+        <h2>Appearance</h2>
+        <p class="hint">System follows your OS setting. The theme, filters and sorting of every tab are saved in <code>data/settings.json</code>.</p>
+        <div class="segmented" role="radiogroup" aria-label="Theme">
+          ${Object.entries(THEMES).map(([value, label]) => `<button type="button" role="radio" data-theme-mode="${value}"
+            aria-checked="${themeMode() === value}" class="${themeMode() === value ? 'on' : ''}">${icon(THEME_ICONS[value], 15)}${label}</button>`).join('')}
+        </div>
+      </section>
       <section class="settings-card">
         <h2>Projects <span class="count">${list.length}</span></h2>
         <p class="hint">
@@ -67,6 +77,8 @@ export function render(view) {
   });
 
   root.addEventListener('click', (e) => {
+    const mode = e.target.closest('[data-theme-mode]')?.dataset.themeMode;
+    if (mode) return setTheme(mode);
     const row = e.target.closest('[data-project]');
     if (!row) return;
     const p = projectById(Number(row.dataset.project));

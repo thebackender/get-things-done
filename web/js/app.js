@@ -2,6 +2,7 @@
 import { store, reload, subscribe, undo } from './store.js';
 import { openTaskEditor } from './editor.js';
 import { esc } from './util.js';
+import { toggleTheme } from './theme.js';
 import * as list from './views/list.js';
 import * as board from './views/board.js';
 import * as backlog from './views/backlog.js';
@@ -29,9 +30,11 @@ subscribe(() => {
   route();
 });
 window.addEventListener('hashchange', route);
+window.addEventListener('themechange', route); // charts and the graph pick their colors in JS
 
 document.getElementById('add-task').addEventListener('click', () => openTaskEditor());
 undoBtn.addEventListener('click', () => undo());
+document.getElementById('theme-btn').addEventListener('click', toggleTheme);
 
 document.addEventListener('keydown', (e) => {
   const typing = e.target.closest('input, textarea, select, [contenteditable]');

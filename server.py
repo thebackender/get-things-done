@@ -22,11 +22,14 @@ ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
 DATA_FILE = DATA_DIR / "planner.json"
 BACKUP_DIR = DATA_DIR / "backups"
+SETTINGS_FILE = DATA_DIR / "settings.json"
 WEB_DIR = ROOT / "web"
 
 KEEP_BACKUPS = 14
 UNDO_DEPTH = 30
 HISTORY_LIMIT = 5000
+THEMES = ("light", "dark", "system")
+SETTINGS_MAX_BYTES = 64 * 1024
 
 TASK_STATUSES = ("todo", "doing", "waiting", "done")
 SPRINT_STATUSES = ("planned", "active", "closed")
@@ -161,6 +164,43 @@ def save(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write("\n")
     os.replace(tmp, DATA_FILE)
+
+
+# ---------- UI settings (data/settings.json) ----------
+# Theme and per-tab view options. Kept apart from planner.json: no undo, history or backups.
+
+def load_settings():
+    try:
+        with SETTINGS_FILE.open(encoding="utf-8") as f:
+            settings = json.load(f)
+    except FileNotFoundError:
+        return {}
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        print(f"Warning: {SETTINGS_FILE.name} is unreadable ({e}); using defaults.", file=sys.stderr)
+        return {}
+    return settings if isinstance(settings, dict) else {}
+
+
+def update_settings(body):
+    """Merge the given top-level keys: "theme" is a string, every other key is one tab's options object."""
+    for key, value in body.items():
+        if key == "theme":
+            if value not in THEMES:
+                raise ApiError(f"theme must be one of: {', '.join(THEMES)}")
+        elif not re.fullmatch(r"[a-z][a-z0-9_]{0,31}", key):
+            raise ApiError(f"Invalid settings key: {key!r}")
+        elif not isinstance(value, dict):
+            raise ApiError(f"Settings for {key!r} must be an object")
+    with lock:
+        settings = {**load_settings(), **body}
+        text = json.dumps(settings, ensure_ascii=False, indent=2) + "\n"
+        if len(text.encode("utf-8")) > SETTINGS_MAX_BYTES:
+            raise ApiError("Settings are too large")
+        DATA_DIR.mkdir(exist_ok=True)
+        tmp = SETTINGS_FILE.with_suffix(".json.tmp")
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, SETTINGS_FILE)
+    return settings
 
 
 def mutate(fn, *args):
@@ -686,6 +726,8 @@ def delete_project(data, project_id):
 ROUTES = [
     ("GET", r"/api/state", lambda body, i: get_state()),
     ("POST", r"/api/undo", lambda body, i: undo()),
+    ("GET", r"/api/settings", lambda body, i: load_settings()),
+    ("PUT", r"/api/settings", lambda body, i: update_settings(body)),
     ("POST", r"/api/tasks", lambda body, i: mutate(create_task, body)),
     ("POST", r"/api/tasks/batch", lambda body, i: mutate(batch_update, body)),
     ("PUT", r"/api/tasks/(\d+)", lambda body, i: mutate(update_task, i, body)),

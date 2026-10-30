@@ -37,6 +37,13 @@ export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 // Categorical palette (dataviz, light theme): colors are assigned in order.
 export const PALETTE = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
 export const OTHER_COLOR = '#9a9893';
+// The same eight hues stepped for the dark surface (dataviz reference palette).
+const DARK_STEPS = {
+  '#2a78d6': '#3987e5', '#eb6834': '#d95926', '#1baf7a': '#199e70', '#eda100': '#c98500',
+  '#e87ba4': '#d55181', '#008300': '#008300', '#6250d6': '#9085e9', '#e34948': '#e66767',
+};
+/** A data color for the current theme. Colors are stored in their light-theme form. */
+export const paint = (hex) => (document.documentElement.dataset.theme === 'dark' && DARK_STEPS[hex?.toLowerCase()]) || hex;
 
 export function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);

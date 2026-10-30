@@ -4,14 +4,20 @@ import { openTaskEditor } from '../editor.js';
 import { projectChip, metaBadges } from '../components.js';
 import { esc, prioIcon, prioClass, statusName, empty } from '../util.js';
 import { icon } from '../icons.js';
+import { getPrefs, setPrefs } from '../prefs.js';
 
-const KEY = 'gtd.list';
-const state = { sort: 'priority', group: 'project', showDone: false, collapsed: [], ...JSON.parse(localStorage.getItem(KEY) || '{}'), q: '' };
-const persist = () => localStorage.setItem(KEY, JSON.stringify({ ...state, q: '' }));
+// View options are saved in data/settings.json; the search box is not.
+const state = { ...getPrefs('list', { sort: 'priority', group: 'project', showDone: false, collapsed: [] }), q: '' };
+const persist = () => setPrefs('list', {
+  sort: state.sort, group: state.group, showDone: state.showDone,
+  collapsed: state.collapsed.filter((id) => taskById(id)), // forget deleted tasks
+});
 
 const SORTS = { priority: 'Priority', due: 'Due date', created: 'Newest first', title: 'Title' };
 const GROUPS = { project: 'Project', status: 'Status', sprint: 'Sprint', none: 'None' };
 if (!GROUPS[state.group]) state.group = 'project'; // saved views from before projects existed
+if (!SORTS[state.sort]) state.sort = 'priority';
+if (!Array.isArray(state.collapsed)) state.collapsed = [];
 const STATUS_ORDER = { doing: 0, todo: 1, waiting: 2, done: 3 };
 
 const doneLast = (a, b) => (a.status === 'done') - (b.status === 'done');

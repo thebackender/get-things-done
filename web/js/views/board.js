@@ -4,8 +4,10 @@ import { openSprintEditor } from '../editor.js';
 import { card, cardClicks, dragAndDrop, progressBar } from '../components.js';
 import { STATUSES, esc, fmtDate, today, daysBetween, empty, freshBox } from '../util.js';
 import { icon } from '../icons.js';
+import { getPrefs, setPrefs } from '../prefs.js';
 
-let selectedId = null;
+// The sprint picked last time; falls back to the active one if it's gone.
+let selectedId = getPrefs('board', { sprintId: null }).sprintId;
 
 export function render(view) {
   const root = freshBox(view);
@@ -50,6 +52,8 @@ export function render(view) {
 
   root.querySelector('.sprint-select').addEventListener('change', (e) => {
     selectedId = Number(e.target.value);
+    // Picking the active sprint means "follow the active sprint", so a new sprint shows up after this one closes.
+    setPrefs('board', { sprintId: selectedId === activeSprint()?.id ? null : selectedId });
     render(view);
   });
   root.querySelector('.edit-sprint').addEventListener('click', () => openSprintEditor(sprint));

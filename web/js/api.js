@@ -1,7 +1,7 @@
 // Thin fetch wrapper: returns JSON or throws an Error with the server's message.
 
-async function request(method, url, body) {
-  const options = { method, headers: {} };
+async function request(method, url, body, extra = {}) {
+  const options = { method, headers: {}, ...extra };
   if (body !== undefined) {
     options.headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
@@ -21,3 +21,6 @@ export const getState = () => request('GET', '/api/state');
 export const post = (url, body = {}) => request('POST', url, body);
 export const put = (url, body) => request('PUT', url, body);
 export const del = (url) => request('DELETE', url);
+export const getSettings = () => request('GET', '/api/settings');
+/** keepalive lets the request finish while the page is closing. */
+export const putSettings = (body, keepalive = false) => request('PUT', '/api/settings', body, { keepalive });

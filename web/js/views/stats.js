@@ -1,27 +1,37 @@
 // Stats tab: summary tiles and SVG charts.
 import { store, activeSprint, sprintOrder, isOverdue, goalSum, projectById, projectList, projectLabel } from '../store.js';
-import { PALETTE, OTHER_COLOR, PRIORITIES, esc, trunc, today, addDays, weekStart, fmtDate, fmtNum, daysBetween, freshBox, empty } from '../util.js';
+import { PALETTE, OTHER_COLOR, PRIORITIES, esc, trunc, today, addDays, weekStart, fmtDate, fmtNum, daysBetween, freshBox, empty, paint } from '../util.js';
+import { getPrefs, setPrefs } from '../prefs.js';
 import { icon } from '../icons.js';
 
 // Charts are drawn at the card's actual width so text never gets stretched.
-// The markup holds an empty slot that is filled once it is in the DOM.
+// The markup holds an empty slot; each chart is drawn at its slot's real width once it is laid out,
+// and again when that width changes (window resize, scrollbar, grid reflow).
 let slots = [];
-let currentRoot = null;
+const drawnWidth = new WeakMap();
+const observer = new ResizeObserver((entries) => entries.forEach((e) => drawSlot(e.target)));
 const slot = (draw) => {
   slots.push(draw);
   return `<div class="chart-slot" data-slot="${slots.length - 1}"></div>`;
 };
-function drawSlots(root) {
-  root.querySelectorAll('.chart-slot').forEach((el) => (el.innerHTML = slots[el.dataset.slot](Math.max(280, el.clientWidth))));
+function drawSlot(el) {
+  if (!el.isConnected) return observer.unobserve(el); // the tab was left or re-rendered
+  const width = Math.max(280, el.clientWidth);
+  if (drawnWidth.get(el) === width) return;
+  drawnWidth.set(el, width);
+  el.innerHTML = slots[el.dataset.slot](width);
 }
-let resizeTimer;
-window.addEventListener('resize', () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => currentRoot?.isConnected && drawSlots(currentRoot), 150);
-});
-const BLUE = PALETTE[0];
-const ORANGE = PALETTE[1];
-let selectedGoal = null;
+function drawSlots(root) {
+  observer.disconnect(); // stop watching the previous render's slots
+  root.querySelectorAll('.chart-slot').forEach((el) => {
+    drawSlot(el);
+    observer.observe(el);
+  });
+}
+// Read at render time: the dark theme uses the palette's dark steps.
+const blue = () => paint(PALETTE[0]);
+const orange = () => paint(PALETTE[1]);
+let selectedGoal = getPrefs('stats', { goalId: null }).goalId;
 
 // ---------- chart primitives ----------
 
@@ -56,7 +66,7 @@ function yAxis(max, pad, ih, W) {
 }
 
 /** Single-series column chart. data: [{label, value, tip}] */
-function columnChart(data, { color = BLUE, height = 190, aria }) {
+function columnChart(data, { color = blue(), height = 190, aria }) {
   return slot((W) => {
     const pad = { l: 34, r: 8, t: 12, b: 24 };
     const iw = W - pad.l - pad.r;
@@ -164,7 +174,7 @@ function weeklyDone() {
 }
 
 function byProject() {
-  const series = [{ name: 'Done', color: BLUE }, { name: 'Open', color: ORANGE }];
+  const series = [{ name: 'Done', color: blue() }, { name: 'Open', color: orange() }];
   const count = (list) => [list.filter((t) => t.status === 'done').length, list.filter((t) => t.status !== 'done').length];
   const rows = projectList().map((p) => ({ label: projectLabel(p.id), values: count(store.tasks.filter((t) => t.project_id === p.id)) }));
   rows.push({ label: 'No project', values: count(store.tasks.filter((t) => !projectById(t.project_id))) });
@@ -244,15 +254,15 @@ function burndown() {
     return `<svg class="chart" viewBox="0 0 ${W} ${height}" role="img" aria-label="Sprint burndown">
       ${yAxis(max, pad, ih, W)}
       <polyline class="ideal" points="${days.map((_, i) => `${x(i)},${y(ideal(i))}`).join(' ')}"/>
-      ${actual.length ? `<polyline class="actual" stroke="${BLUE}" points="${actual.map((p) => `${x(p.i)},${y(p.v)}`).join(' ')}"/>` : ''}
-      ${days.length <= 31 ? actual.map((p) => `<circle cx="${x(p.i)}" cy="${y(p.v)}" r="4" fill="${BLUE}" class="marker"/>`).join('') : ''}
+      ${actual.length ? `<polyline class="actual" stroke="${blue()}" points="${actual.map((p) => `${x(p.i)},${y(p.v)}`).join(' ')}"/>` : ''}
+      ${days.length <= 31 ? actual.map((p) => `<circle cx="${x(p.i)}" cy="${y(p.v)}" r="4" fill="${blue()}" class="marker"/>`).join('') : ''}
       ${days.map((d, i) => `${i % every === 0 ? `<text class="axis" x="${x(i)}" y="${height - 6}" text-anchor="middle">${fmtDate(d)}</text>` : ''}
         <rect class="hit" x="${x(i) - step / 2}" y="${pad.t}" width="${step}" height="${ih}"
           data-tip="${fmtDate(d)}: ${d <= now ? `${left(d)} left, ` : ''}plan ${fmtNum(ideal(i).toFixed(1))}"/>`).join('')}
     </svg>`;
   });
   return statCard(`Burndown: ${esc(sp.name)}`,
-    legend([{ name: 'Tasks left', color: BLUE }, { name: 'Ideal pace', color: OTHER_COLOR, dashed: true }]) + svg +
+    legend([{ name: 'Tasks left', color: blue() }, { name: 'Ideal pace', color: OTHER_COLOR, dashed: true }]) + svg +
     tableView(['Day', 'Left', 'Plan'], days.map((d, i) => [fmtDate(d), d <= now ? left(d) : '', fmtNum(ideal(i).toFixed(1))])));
 }
 
@@ -272,7 +282,6 @@ function velocity() {
 
 export function render(view) {
   const root = freshBox(view);
-  currentRoot = root;
   slots = [];
   if (!store.tasks.length) {
     root.innerHTML = empty('Stats show up once you have tasks.');
@@ -296,6 +305,7 @@ export function render(view) {
   root.addEventListener('mouseleave', () => (tip.hidden = true));
   root.querySelector('.goal-select')?.addEventListener('change', (e) => {
     selectedGoal = Number(e.target.value);
+    setPrefs('stats', { goalId: selectedGoal });
     render(view);
   });
 }
