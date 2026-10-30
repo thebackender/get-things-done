@@ -1,5 +1,5 @@
 // Task list (left side of the Tasks tab): task tree with search, a Sprint / All filter, sorting and grouping.
-import { store, taskById, childrenOf, sprintById, sprintPhase, activeSprint, projectById, projectList, projectLabel, projectColor, byPriority, byDue, updateTask } from '../store.js';
+import { store, taskById, childrenOf, sprintById, sprintPhase, activeSprint, projectById, projectList, projectLabel, projectColor, updateTask } from '../store.js';
 import { openTaskEditor, openSprintEditor } from '../editor.js';
 import { projectChip, metaBadges, progressBar, sprintGoals } from '../components.js';
 import { esc, prioIcon, prioClass, statusName, empty, freshBox, fmtDate, today, daysBetween } from '../util.js';
@@ -7,9 +7,9 @@ import { icon } from '../icons.js';
 import { getPrefs, setPrefs } from '../prefs.js';
 
 // View options are saved in data/settings.json; the search box is not.
-const state = { ...getPrefs('list', { scope: 'sprint', sort: 'priority', group: 'project', showDone: false, collapsed: [] }), q: '' };
+const state = { ...getPrefs('list', { scope: 'sprint', sort: 'priority', group: 'project', hideDone: false, collapsed: [] }), q: '' };
 const persist = () => setPrefs('list', {
-  scope: state.scope, sort: state.sort, group: state.group, showDone: state.showDone,
+  scope: state.scope, sort: state.sort, group: state.group, hideDone: state.hideDone,
   collapsed: state.collapsed.filter((id) => taskById(id)), // forget deleted tasks
 });
 
@@ -22,19 +22,21 @@ if (!SCOPES[state.scope]) state.scope = 'sprint';
 if (!Array.isArray(state.collapsed)) state.collapsed = [];
 const STATUS_ORDER = { doing: 0, todo: 1, waiting: 2, done: 3 };
 
-const doneLast = (a, b) => (a.status === 'done') - (b.status === 'done');
+// Done tasks stay where the sort puts them (they are shown struck through), not moved to the bottom.
+const dueKey = (t) => t.due || '9999';
 const COMPARE = {
-  priority: byPriority,
-  due: byDue,
-  created: (a, b) => doneLast(a, b) || b.id - a.id,
-  title: (a, b) => doneLast(a, b) || a.title.localeCompare(b.title, 'ru'),
+  priority: (a, b) => b.priority - a.priority || dueKey(a).localeCompare(dueKey(b)) || a.id - b.id,
+  due: (a, b) => dueKey(a).localeCompare(dueKey(b)) || b.priority - a.priority || a.id - b.id,
+  created: (a, b) => b.id - a.id,
+  title: (a, b) => a.title.localeCompare(b.title, 'ru'),
 };
 const cmp = (a, b) => COMPARE[state.sort](a, b);
-const visible = (t) => state.showDone || t.status !== 'done';
 
 /** "Sprint" shows only the active sprint's tasks; without an active sprint it shows everything. */
 const scopeSprint = () => (state.scope === 'sprint' ? activeSprint() : null);
 /** The Sprint / All filter, shared with the calendar. */
+/** What the list shows: the scope, minus done tasks when "Hide done" is on. The calendar uses scopeFilter only. */
+const shown = (t) => scopeFilter(t) && !(state.hideDone && t.status === 'done');
 export function scopeFilter(t) {
   const sprint = scopeSprint();
   return !sprint || t.sprint_id === sprint.id;
@@ -79,7 +81,7 @@ export function render(pane, opts = {}) {
         <div class="menu">
           <label>Sort ${select('sort', SORTS)}</label>
           <label>Group ${select('group', GROUPS)}</label>
-          <label class="check"><input type="checkbox" class="show-done" ${state.showDone ? 'checked' : ''}> Show done</label>
+          <label class="check"><input type="checkbox" class="hide-done" ${state.hideDone ? 'checked' : ''}> Hide done</label>
         </div>
       </details>
     </div>
@@ -103,8 +105,8 @@ export function render(pane, opts = {}) {
   root.addEventListener('change', (e) => {
     if (e.target.matches('select[data-key]')) {
       state[e.target.dataset.key] = e.target.value;
-    } else if (e.target.matches('.show-done')) {
-      state.showDone = e.target.checked;
+    } else if (e.target.matches('.hide-done')) {
+      state.hideDone = e.target.checked;
     } else if (e.target.matches('.done-toggle')) {
       const id = Number(e.target.closest('.row').dataset.id);
       return updateTask(id, { status: e.target.checked ? 'done' : 'todo' });
@@ -142,7 +144,6 @@ function renderBody(root) {
     body.innerHTML = empty('No tasks yet. Click "New task" or press <kbd>N</kbd>.');
     return;
   }
-  const shown = (t) => visible(t) && scopeFilter(t);
 
   const q = state.q.trim().toLowerCase();
   if (q) {
@@ -160,8 +161,8 @@ function renderBody(root) {
       ${state.group !== 'none' ? `<h3>${color ? `<i class="dot" style="--c:${color}"></i>` : ''}${esc(name)} <span class="count">${items.length}</span></h3>` : ''}
       ${items.map((t) => tree(t, 0)).join('')}
     </section>`).join('') || empty(scopeSprint()
-    ? 'Nothing open in this sprint. Add tasks to it in the <a href="#backlog">Backlog</a> tab, or switch to All.'
-    : 'All done. Turn on "Show done" under View to see finished tasks.');
+    ? 'No tasks in this sprint. Add tasks to it in the <a href="#backlog">Backlog</a> tab, or switch to All.'
+    : state.hideDone ? 'Nothing left to do. Turn off "Hide done" under View to see finished tasks.' : 'No tasks.');
 }
 
 function groups(roots) {
@@ -194,7 +195,7 @@ function groups(roots) {
 }
 
 function tree(t, depth) {
-  const kids = childrenOf(t.id).filter((k) => visible(k) && scopeFilter(k)).sort(cmp);
+  const kids = childrenOf(t.id).filter(shown).sort(cmp);
   const collapsed = state.collapsed.includes(t.id);
   return row(t, depth, { hasKids: childrenOf(t.id).length > 0, collapsed }) +
     (collapsed ? '' : kids.map((k) => tree(k, depth + 1)).join(''));

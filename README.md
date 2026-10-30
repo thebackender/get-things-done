@@ -16,7 +16,7 @@ The server listens on `127.0.0.1` only, so it isn't reachable from the network.
 
 | Tab | What it does |
 |---|---|
-| Tasks | Task list on the left, calendar on the right; both show the same tasks. **Sprint** shows only the current sprint's tasks, with its dates, days left, progress and goals above the list; **All** shows everything. View: sort, group by project, status or sprint, show done tasks. Drag a task from the list onto a calendar day to set its due date |
+| Tasks | Task list on the left, calendar on the right; both show the same tasks. **Sprint** shows only the current sprint's tasks, with its dates, days left, progress and goals above the list; **All** shows everything. Done tasks stay in place, struck through. View: sort, group by project, status or sprint, hide done tasks. Drag a task from the list onto a calendar day to set its due date |
 | Backlog | Unfinished tasks without a sprint, plus those left over from sprints that have ended. Sprints are collapsed: click one to see its tasks. Drag a task onto a sprint (open or not) and its unfinished subtasks come along. Create and edit sprints here |
 | Graph | Tasks as nodes. Solid line: subtask. Dashed arrow A ⇢ B: A blocks B |
 | Stats | Summary, done per week, sprint burndown, projects, priorities, velocity, goals |
@@ -83,7 +83,7 @@ Unfinished tasks of a past sprint keep their `sprint_id` but show up in the back
 
 ### UI settings
 
-`data/settings.json` keeps the theme and each tab's view options: the Sprint / All filter, sorting, grouping, "show done" and collapsed tasks in the list,
+`data/settings.json` keeps the theme and each tab's view options: the Sprint / All filter, sorting, grouping, "Hide done" and collapsed tasks in the list,
 the year/month view of the calendar, which sprints are open in Backlog, the checkboxes in Graph, the goal picked in Stats. The page saves it as you change things.
 It is separate from `planner.json`: no undo, no history, no backups. Delete it to reset everything to defaults.
 
