@@ -59,7 +59,7 @@ Editing a task in the UI drops its links to deleted items.
 
 The UI shows and accepts dates as `DD.MM.YYYY`; the file stores them as `YYYY-MM-DD`.
 
-Before the first write of each day, the server copies the file to `planner-YYYY-MM-DD.json` in the backup folder (`data/backups/` unless set with `--backup-dir`) and keeps the last 14 copies.
+Before the first write of each day, the server copies the file to `planner-YYYY-MM-DD.json` in the backup folder (`data/backups/` unless set in `.env` or with `--backup-dir`). The archive button in the header makes a backup right away (`planner-YYYY-MM-DD_HH-MM-SS.json`) and shows when the last backup was made; hover it to see the file and the folder. The last 14 daily and the last 14 button-made backups are kept, so clicking often never pushes out the daily ones.
 To roll back, stop the server and copy a backup over `data/planner.json`.
 
 ### Task fields

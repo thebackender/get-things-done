@@ -160,6 +160,9 @@ button.danger:hover:not(:disabled) { background: var(--destructive-bg); }
 button.square { width: 36px; padding: 0; }
 button.ghost { border-color: transparent; background: transparent; box-shadow: none; }
 button.ghost:hover:not(:disabled) { background: var(--accent); }
+/* Header: the Backup button with the time of the last backup. */
+.backup-btn { height: 32px; padding: 0 8px; gap: 6px; font-size: 12px; font-weight: 500; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.backup-btn:hover:not(:disabled) { color: var(--foreground); }
 button.icon {
   width: 32px; height: 32px; padding: 0;
   border-color: transparent; background: transparent; box-shadow: none;

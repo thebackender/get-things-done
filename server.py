@@ -178,17 +178,60 @@ def migrate_categories(data):
     data.pop("tags", None)
 
 
+# Backups live in BACKUP_DIR (data/backups/ by default):
+#   planner-YYYY-MM-DD.json           daily, made before the first change of the day
+#   planner-YYYY-MM-DD_HH-MM-SS.json  made with the Backup button
+# The last KEEP_BACKUPS of each kind are kept, so clicking the button often never pushes out the daily ones.
+# A backup file's modification time is when it was made.
+
+def prune_backups():
+    daily = sorted(BACKUP_DIR.glob("planner-????-??-??.json"))
+    manual = sorted(BACKUP_DIR.glob("planner-????-??-??_*.json"))
+    for old in daily[:-KEEP_BACKUPS] + manual[:-KEEP_BACKUPS]:
+        old.unlink(missing_ok=True)
+
+
 def backup_daily():
-    """Before the first write of the day, copy the current file to BACKUP_DIR (data/backups/ by default)."""
+    """Before the first write of the day, copy the current file to BACKUP_DIR."""
     if not DATA_FILE.exists():
         return
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     target = BACKUP_DIR / f"planner-{today()}.json"
     if target.exists():
         return
-    shutil.copy2(DATA_FILE, target)
-    for old in sorted(BACKUP_DIR.glob("planner-*.json"))[:-KEEP_BACKUPS]:
-        old.unlink()
+    shutil.copyfile(DATA_FILE, target)
+    prune_backups()
+
+
+def backup_now():
+    """The Backup button: copy the current file right away."""
+    with lock:
+        if not DATA_FILE.exists():
+            raise ApiError("Nothing to back up yet")
+        try:
+            BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+            target = BACKUP_DIR / f"planner-{datetime.now():%Y-%m-%d_%H-%M-%S}.json"
+            shutil.copyfile(DATA_FILE, target)
+            prune_backups()
+        except OSError as e:
+            raise ApiError(f"Backup failed: {e}", 500)
+    return {"ok": True, "file": target.name, "last_backup": last_backup()}
+
+
+def last_backup():
+    """{time, file, dir} of the newest backup, or {dir} alone when there is none yet."""
+    newest, newest_time = None, 0
+    for path in BACKUP_DIR.glob("planner-*.json") if BACKUP_DIR.exists() else []:
+        try:
+            made = path.stat().st_mtime
+        except OSError:
+            continue  # removed meanwhile
+        if made > newest_time:
+            newest, newest_time = path, made
+    info = {"dir": str(BACKUP_DIR)}
+    if newest:
+        info.update(time=datetime.fromtimestamp(newest_time).isoformat(timespec="seconds"), file=newest.name)
+    return info
 
 
 def save(data):
@@ -273,7 +316,8 @@ def get_state():
         view["related"] = [r for r in view["related"] if r in task_ids]
         shown.append(view)
     return {"tasks": shown, "sprints": sprints, "projects": projects,
-            "history": data["history"], "can_undo": bool(undo_stack), "limits": LIMITS}
+            "history": data["history"], "can_undo": bool(undo_stack), "limits": LIMITS,
+            "last_backup": last_backup()}
 
 
 def undo():
@@ -833,6 +877,7 @@ def delete_project(data, project_id):
 ROUTES = [
     ("GET", r"/api/state", lambda body, i: get_state()),
     ("POST", r"/api/undo", lambda body, i: undo()),
+    ("POST", r"/api/backup", lambda body, i: backup_now()),
     ("GET", r"/api/settings", lambda body, i: load_settings()),
     ("PUT", r"/api/settings", lambda body, i: update_settings(body)),
     ("POST", r"/api/tasks", lambda body, i: mutate(create_task, body)),

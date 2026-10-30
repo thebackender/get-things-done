@@ -1,7 +1,7 @@
 // Entry point: tabs, keyboard shortcuts, re-render on data changes.
-import { store, reload, subscribe, undo } from './store.js';
+import { store, reload, subscribe, undo, backupNow } from './store.js';
 import { openTaskEditor } from './editor.js';
-import { esc } from './util.js';
+import { esc, today, addDays, fmtDate, fmtTs } from './util.js';
 import { toggleTheme } from './theme.js';
 import * as tasks from './views/tasks.js';
 import * as backlog from './views/backlog.js';
@@ -13,6 +13,22 @@ const VIEWS = { list: tasks, backlog, graph, projects };
 const ALIASES = { board: 'list', calendar: 'list', stats: 'list', settings: 'projects' };
 const main = document.getElementById('view');
 const undoBtn = document.getElementById('undo-btn');
+const backupBtn = document.getElementById('backup-btn');
+
+/** The Backup button shows when the last backup was made: "14:32" today, "yesterday 23:10", or a date. */
+function showLastBackup() {
+  const info = store.lastBackup;
+  const label = backupBtn.querySelector('.backup-time');
+  if (!info?.time) {
+    label.textContent = 'no backup';
+    backupBtn.title = `Back up now. No backups yet.${info?.dir ? `\nFolder: ${info.dir}` : ''}`;
+    return;
+  }
+  const [day, time] = info.time.split('T');
+  const hm = time.slice(0, 5);
+  label.textContent = day === today() ? hm : day === addDays(today(), -1) ? `yesterday ${hm}` : fmtDate(day).slice(0, 5);
+  backupBtn.title = `Back up now\nLast backup: ${fmtTs(info.time)} (${info.file})\nFolder: ${info.dir}`;
+}
 
 let current = 'list';
 
@@ -30,6 +46,7 @@ function route() {
 
 subscribe(() => {
   undoBtn.disabled = !store.canUndo;
+  showLastBackup();
   route();
 });
 window.addEventListener('hashchange', route);
@@ -39,6 +56,11 @@ window.addEventListener('themechange', route); // charts and the graph pick thei
 const newTask = () => openTaskEditor(null, VIEWS[current].newTaskPreset?.() ?? {});
 document.getElementById('add-task').addEventListener('click', newTask);
 undoBtn.addEventListener('click', () => undo());
+backupBtn.addEventListener('click', async () => {
+  backupBtn.disabled = true;
+  await backupNow();
+  backupBtn.disabled = false;
+});
 document.getElementById('theme-btn').addEventListener('click', toggleTheme);
 
 // Shortcuts use e.code (the physical key), so they also work with a Russian keyboard layout.

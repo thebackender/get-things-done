@@ -2,7 +2,7 @@
 import * as api from './api.js';
 import { OTHER_COLOR, paint, today, toast } from './util.js';
 
-export const store = { tasks: [], sprints: [], projects: [], history: [], canUndo: false, limits: {} };
+export const store = { tasks: [], sprints: [], projects: [], history: [], canUndo: false, limits: {}, lastBackup: null };
 
 const listeners = new Set();
 export const subscribe = (fn) => listeners.add(fn);
@@ -20,6 +20,7 @@ export async function reload() {
   store.history = state.history;
   store.canUndo = state.can_undo;
   store.limits = state.limits ?? {};
+  store.lastBackup = state.last_backup ?? null; // {time, file, dir}; no time when there is no backup yet
   byId = new Map(store.tasks.map((t) => [t.id, t]));
   kids = new Map();
   for (const t of store.tasks) {
@@ -157,6 +158,9 @@ export const createProject = (body) => run(api.post('/api/projects', body));
 export const updateProject = (id, data) => run(api.put(`/api/projects/${id}`, data));
 export const deleteProject = (id) =>
   run(api.del(`/api/projects/${id}`), (r) => `Project deleted${r.cleared ? `, removed from ${r.cleared} task(s)` : ''}`);
+
+/** The Backup button: copy planner.json to the backup folder now. */
+export const backupNow = () => run(api.post('/api/backup'), (r) => `Backup saved: ${r.file}`);
 
 export async function undo() {
   if (!store.canUndo) return toast('Nothing to undo');
