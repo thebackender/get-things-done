@@ -1,5 +1,5 @@
 // Shared markup and behavior: task card, badges, drag and drop.
-import { taskById, childrenOf, blockers, isOverdue, goalSum, projectColor, projectLabel, addProgress } from './store.js';
+import { taskById, childrenOf, descendants, blockers, isOverdue, goalSum, projectColor, projectLabel, addProgress, updateTask, deleteTask } from './store.js';
 import { openTaskEditor } from './editor.js';
 import { esc, fmtDate, fmtNum, prioIcon, prioClass, trunc, toast } from './util.js';
 import { icon } from './icons.js';
@@ -154,3 +154,22 @@ document.addEventListener('pointerdown', (e) => !e.target.closest?.('.ctx-menu')
 document.addEventListener('keydown', (e) => e.key === 'Escape' && closeContextMenu());
 window.addEventListener('resize', closeContextMenu);
 document.addEventListener('scroll', closeContextMenu, true);
+
+/** Right-click actions for a task, shared by the list and the graph. */
+export function taskMenuItems(t) {
+  const done = t.status === 'done';
+  const subs = descendants(t.id).length;
+  return [
+    { label: 'Add subtask', icon: 'plus', action: () => openTaskEditor(null, { parent_id: t.id, project_id: t.project_id, sprint_id: t.sprint_id }) },
+    { label: 'Edit', icon: 'pencil', action: () => openTaskEditor(t) },
+    null,
+    { label: done ? 'Mark not done' : 'Mark done', icon: done ? 'undo' : 'check', action: () => updateTask(t.id, { status: done ? 'todo' : 'done' }) },
+    t.parent_id != null && taskById(t.parent_id)
+      ? { label: 'Make top-level', icon: 'cornerDownRight', action: () => updateTask(t.id, { parent_id: null }) } : undefined,
+    null,
+    {
+      label: 'Delete…', icon: 'x', danger: true,
+      action: () => confirm(`Delete "${t.title}"${subs ? ` and its ${subs} subtask(s)` : ''}? Ctrl+Z brings it back.`) && deleteTask(t.id),
+    },
+  ].filter((it) => it !== undefined);
+}

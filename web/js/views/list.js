@@ -1,7 +1,7 @@
 // Task list (left side of the Tasks tab): task tree with search, a Sprint / All filter, sorting and grouping.
 import { store, taskById, childrenOf, descendants, sprintById, sprintPhase, activeSprint, projectById, projectList, projectLabel, projectColor, updateTask } from '../store.js';
 import { openTaskEditor, openSprintEditor } from '../editor.js';
-import { projectChip, metaBadges, progressBar, sprintGoals, openContextMenu } from '../components.js';
+import { projectChip, metaBadges, progressBar, sprintGoals, openContextMenu, taskMenuItems } from '../components.js';
 import { esc, prioIcon, prioClass, statusName, empty, freshBox, fmtDate, today, daysBetween, trunc, toast, PRIORITIES } from '../util.js';
 import { icon } from '../icons.js';
 import { getPrefs, setPrefs } from '../prefs.js';
@@ -271,16 +271,7 @@ export function render(pane, opts = {}, openMenu = null) {
     const row = e.target.closest('.row');
     if (!row) return;
     e.preventDefault();
-    const t = taskById(Number(row.dataset.id));
-    const done = t.status === 'done';
-    openContextMenu(e.clientX, e.clientY, [
-      { label: 'Add subtask', icon: 'plus', action: () => openTaskEditor(null, { parent_id: t.id, project_id: t.project_id, sprint_id: t.sprint_id }) },
-      { label: 'Edit', icon: 'pencil', action: () => openTaskEditor(t) },
-      null,
-      { label: done ? 'Mark not done' : 'Mark done', icon: done ? 'undo' : 'check', action: () => updateTask(t.id, { status: done ? 'todo' : 'done' }) },
-      t.parent_id != null && taskById(t.parent_id)
-        ? { label: 'Make top-level', icon: 'cornerDownRight', action: () => updateTask(t.id, { parent_id: null }) } : undefined,
-    ].filter((it) => it !== undefined));
+    openContextMenu(e.clientX, e.clientY, taskMenuItems(taskById(Number(row.dataset.id))));
   });
 }
 
