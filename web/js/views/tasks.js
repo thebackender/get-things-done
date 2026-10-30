@@ -4,6 +4,8 @@ import * as calendar from './calendar.js';
 import { freshBox } from '../util.js';
 
 export const newTaskPreset = list.newTaskPreset;
+/** Esc leaves the Prioritize mode of the list. */
+export const onEscape = () => list.exitPrioritize();
 
 export function render(view) {
   const root = freshBox(view);

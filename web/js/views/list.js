@@ -1,5 +1,5 @@
 // Task list (left side of the Tasks tab): task tree with search, a Sprint / All filter, sorting and grouping.
-import { store, taskById, childrenOf, descendants, sprintById, sprintPhase, activeSprint, projectById, projectList, projectLabel, projectColor, updateTask } from '../store.js';
+import { store, taskById, childrenOf, descendants, sprintById, sprintPhase, activeSprint, prioritySlots, projectById, projectList, projectLabel, projectColor, updateTask } from '../store.js';
 import { openTaskEditor, openSprintEditor } from '../editor.js';
 import { projectChip, metaBadges, doingBadge, progressBar, sprintGoals, openContextMenu, taskMenuItems } from '../components.js';
 import { esc, prioIcon, prioClass, statusName, empty, freshBox, today, daysBetween, trunc, toast, PRIORITIES } from '../util.js';
@@ -135,6 +135,97 @@ document.addEventListener('click', (e) => {
 const select = (key, options) =>
   `<select data-key="${key}">${Object.entries(options).map(([v, l]) => `<option value="${v}" ${state[key] === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
 
+// ---------- Prioritize mode ----------
+// The shown sprint's unfinished tasks in one box per priority level. Dragging a task onto another level gives it
+// that priority; within a level tasks are sorted by due date. Critical / Highest / High show their free slots and
+// don't take more than the sprint's limit. Filters don't apply here: it shows the whole sprint.
+let prioritizing = false;
+let rerender = null;
+
+/** Esc leaves the mode. Returns true if it was on. */
+export function exitPrioritize() {
+  if (!prioritizing) return false;
+  prioritizing = false;
+  rerender?.();
+  return true;
+}
+
+function boardRow(t) {
+  const parent = t.parent_id != null ? taskById(t.parent_id) : null;
+  return `<div class="row prow prio-${prioClass(t.priority)} st-${t.status}" data-id="${t.id}" draggable="true">
+    <span class="grip" aria-hidden="true">${icon('grip', 14)}</span>
+    ${prioIcon(t.priority)}
+    <span class="title">${esc(t.title)}${parent ? ` <span class="muted">· in ${esc(parent.title)}</span>` : ''}</span>
+    ${doingBadge(t)}
+    <span class="meta">${metaBadges(t)}${projectChip(t.project_id)}</span>
+  </div>`;
+}
+
+function renderBoard(body, sprint) {
+  const open = store.tasks.filter((t) => t.sprint_id === sprint.id && t.status !== 'done');
+  const levels = PRIORITIES.map((p) => {
+    const items = open.filter((t) => t.priority === p.value).sort(COMPARE.priority);
+    const slots = prioritySlots(sprint.id, p.value);
+    const free = slots ? Math.max(0, slots.limit - items.length) : 0;
+    const full = !!slots && items.length >= slots.limit;
+    return `<section class="group prio-level" data-priority="${p.value}"${full ? ' data-full' : ''}>
+      <h3>${prioIcon(p.value)} ${p.name}
+        <span class="count${slots && items.length > slots.limit ? ' over' : ''}">${slots ? `${items.length}/${slots.limit}` : items.length}</span>
+        <span class="full-note">full</span></h3>
+      <div class="prio-items">${items.map(boardRow).join('')}${'<div class="slot">free slot</div>'.repeat(free)}${
+        !slots && !items.length ? '<div class="slot">drop here</div>' : ''}</div>
+    </section>`;
+  }).join('');
+  body.innerHTML = `<p class="hint">Drag a task onto another level to change its priority. Within a level, tasks are sorted by due date. Done tasks and the Project / Priority filters are left out here.</p>
+    <div class="prio-board">${levels}</div>`;
+
+  const board = body.querySelector('.prio-board');
+  let dragId = null;
+  /** The level the dragged task would move to: {level, into}, or null (its own level, or a full one). */
+  const target = (e) => {
+    const level = e.target.closest('.prio-level');
+    const t = taskById(dragId);
+    if (!level || !t) return null;
+    const into = Number(level.dataset.priority);
+    if (into === t.priority) return null;
+    if (level.hasAttribute('data-full')) {
+      level.classList.add('no-drop');
+      return null;
+    }
+    return { level, into };
+  };
+  const clear = () => board.querySelectorAll('.no-drop, .drop-into').forEach((el) => el.classList.remove('no-drop', 'drop-into'));
+  board.addEventListener('dragstart', (e) => {
+    const row = e.target.closest?.('.prow');
+    if (!row) return;
+    dragId = Number(row.dataset.id);
+    e.dataTransfer.setData('text/plain', row.dataset.id); // a calendar day still takes it as a due date
+    e.dataTransfer.effectAllowed = 'move';
+    row.classList.add('dragging');
+  });
+  board.addEventListener('dragover', (e) => {
+    if (dragId == null) return;
+    clear();
+    const to = target(e);
+    if (!to) return;
+    e.preventDefault();
+    to.level.classList.add('drop-into');
+  });
+  board.addEventListener('dragleave', (e) => !board.contains(e.relatedTarget) && clear());
+  board.addEventListener('drop', async (e) => {
+    const to = dragId != null ? target(e) : null;
+    clear();
+    if (!to) return;
+    e.preventDefault();
+    await updateTask(dragId, { priority: to.into }); // the server checks the sprint's limit too
+  });
+  board.addEventListener('dragend', (e) => {
+    e.target.closest?.('.prow')?.classList.remove('dragging');
+    clear();
+    dragId = null;
+  });
+}
+
 function sprintLine(sprint) {
   const tasks = store.tasks.filter((t) => t.sprint_id === sprint.id);
   const done = tasks.filter((t) => t.status === 'done').length;
@@ -146,6 +237,8 @@ function sprintLine(sprint) {
       ${sprintGoals(sprint)}
     </div>
     <span class="sprint-progress" title="${done} of ${tasks.length} done">${progressBar(done, tasks.length)} ${done}/${tasks.length}</span>
+    <button type="button" class="prioritize-btn${prioritizing ? ' primary' : ''}" title="${prioritizing ? 'Back to the list (Esc)' : 'Order the sprint\'s tasks by dragging them'}">
+      ${icon(prioritizing ? 'check' : 'arrowUpDown', 14)} ${prioritizing ? 'Done' : 'Prioritize'}</button>
     <button class="icon edit-sprint" title="Edit sprint">${icon('pencil', 15)}</button>
   </div>`;
 }
@@ -158,6 +251,8 @@ export function render(pane, opts = {}, openMenu = null) {
   const root = freshBox(pane);
   const active = activeSprint();
   const sprint = scopeSprint();
+  if (!sprint) prioritizing = false; // the mode works on the shown sprint
+  rerender = () => render(pane, opts);
   root.innerHTML = `
     <div class="toolbar list-toolbar">
       <input type="search" class="q" placeholder="Search…" value="${esc(state.q)}">
@@ -200,6 +295,10 @@ export function render(pane, opts = {}, openMenu = null) {
     opts.onScopeChange?.();
   });
   root.querySelector('.edit-sprint')?.addEventListener('click', () => openSprintEditor(sprint));
+  root.querySelector('.prioritize-btn')?.addEventListener('click', () => {
+    prioritizing = !prioritizing;
+    render(pane, opts);
+  });
   root.addEventListener('change', (e) => {
     if (e.target.matches('select[data-key]')) {
       state[e.target.dataset.key] = e.target.value;
@@ -245,6 +344,7 @@ export function render(pane, opts = {}, openMenu = null) {
     return header && t.parent_id != null ? { el: header, parent: null } : null;
   };
   tree.addEventListener('dragstart', (e) => {
+    if (prioritizing) return; // the Prioritize board handles its own drags
     const row = e.target.closest?.('.row[draggable]');
     if (!row) return;
     dragId = Number(row.dataset.id);
@@ -253,6 +353,7 @@ export function render(pane, opts = {}, openMenu = null) {
     row.classList.add('dragging');
   });
   tree.addEventListener('dragover', (e) => {
+    if (prioritizing) return;
     const target = dropTarget(e);
     clearMarks();
     if (!target) return;
@@ -261,6 +362,7 @@ export function render(pane, opts = {}, openMenu = null) {
   });
   tree.addEventListener('dragleave', (e) => !tree.contains(e.relatedTarget) && clearMarks());
   tree.addEventListener('drop', async (e) => {
+    if (prioritizing) return;
     const target = dropTarget(e);
     clearMarks();
     if (!target) return;
@@ -287,6 +389,8 @@ export function render(pane, opts = {}, openMenu = null) {
 
 function renderBody(root) {
   const body = root.querySelector('.tree');
+  const sprint = scopeSprint();
+  if (prioritizing && sprint) return renderBoard(body, sprint);
   if (!store.tasks.length) {
     body.innerHTML = empty('No tasks yet. Click + or press <kbd>N</kbd>.');
     return;
