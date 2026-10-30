@@ -1,8 +1,8 @@
 // Task list (left side of the Tasks tab): task tree with search, a Sprint / All filter, sorting and grouping.
-import { store, taskById, childrenOf, sprintById, sprintPhase, activeSprint, projectById, projectList, projectLabel, projectColor, updateTask } from '../store.js';
+import { store, taskById, childrenOf, descendants, sprintById, sprintPhase, activeSprint, projectById, projectList, projectLabel, projectColor, updateTask } from '../store.js';
 import { openTaskEditor, openSprintEditor } from '../editor.js';
-import { projectChip, metaBadges, progressBar, sprintGoals } from '../components.js';
-import { esc, prioIcon, prioClass, statusName, empty, freshBox, fmtDate, today, daysBetween, trunc, PRIORITIES } from '../util.js';
+import { projectChip, metaBadges, progressBar, sprintGoals, openContextMenu } from '../components.js';
+import { esc, prioIcon, prioClass, statusName, empty, freshBox, fmtDate, today, daysBetween, trunc, toast, PRIORITIES } from '../util.js';
 import { icon } from '../icons.js';
 import { getPrefs, setPrefs } from '../prefs.js';
 
@@ -215,15 +215,73 @@ export function render(pane, opts = {}, openMenu = null) {
     }
     openTaskEditor(taskById(id));
   });
-  // Rows can be dropped on a calendar day to set the due date (the calendar handles the drop).
+  // ---------- drag and drop ----------
+  // A row dropped on another row becomes its subtask; dropped on a group header, a top-level task.
+  // Rows can also be dropped on a calendar day to set the due date (the calendar handles that drop).
+  let dragId = null;
+  const clearMarks = () => tree.querySelectorAll('.drop-into').forEach((el) => el.classList.remove('drop-into'));
+  /** Where the dragged task would go: { el, parent } or null when the drop isn't allowed. */
+  const dropTarget = (e) => {
+    const t = taskById(dragId);
+    if (!t) return null;
+    const row = e.target.closest('.row');
+    if (row) {
+      const target = Number(row.dataset.id);
+      // Not onto itself, its current parent or its own subtasks (that would make a loop).
+      if (target === t.id || target === t.parent_id || descendants(t.id).some((d) => d.id === target)) return null;
+      return { el: row, parent: target };
+    }
+    const header = e.target.closest('.group h3');
+    return header && t.parent_id != null ? { el: header, parent: null } : null;
+  };
   tree.addEventListener('dragstart', (e) => {
     const row = e.target.closest?.('.row[draggable]');
     if (!row) return;
+    dragId = Number(row.dataset.id);
     e.dataTransfer.setData('text/plain', row.dataset.id);
     e.dataTransfer.effectAllowed = 'move';
     row.classList.add('dragging');
   });
-  tree.addEventListener('dragend', (e) => e.target.closest?.('.row')?.classList.remove('dragging'));
+  tree.addEventListener('dragover', (e) => {
+    const target = dropTarget(e);
+    clearMarks();
+    if (!target) return;
+    e.preventDefault();
+    target.el.classList.add('drop-into');
+  });
+  tree.addEventListener('dragleave', (e) => !tree.contains(e.relatedTarget) && clearMarks());
+  tree.addEventListener('drop', async (e) => {
+    const target = dropTarget(e);
+    clearMarks();
+    if (!target) return;
+    e.preventDefault();
+    const t = taskById(dragId);
+    if (await updateTask(t.id, { parent_id: target.parent })) {
+      toast(target.parent == null ? `"${trunc(t.title, 40)}" is a top-level task now` : `"${trunc(t.title, 40)}" is a subtask of "${trunc(taskById(target.parent).title, 40)}"`);
+    }
+  });
+  tree.addEventListener('dragend', (e) => {
+    e.target.closest?.('.row')?.classList.remove('dragging');
+    clearMarks();
+    dragId = null;
+  });
+
+  // ---------- right-click menu ----------
+  tree.addEventListener('contextmenu', (e) => {
+    const row = e.target.closest('.row');
+    if (!row) return;
+    e.preventDefault();
+    const t = taskById(Number(row.dataset.id));
+    const done = t.status === 'done';
+    openContextMenu(e.clientX, e.clientY, [
+      { label: 'Add subtask', icon: 'plus', action: () => openTaskEditor(null, { parent_id: t.id, project_id: t.project_id, sprint_id: t.sprint_id }) },
+      { label: 'Edit', icon: 'pencil', action: () => openTaskEditor(t) },
+      null,
+      { label: done ? 'Mark not done' : 'Mark done', icon: done ? 'undo' : 'check', action: () => updateTask(t.id, { status: done ? 'todo' : 'done' }) },
+      t.parent_id != null && taskById(t.parent_id)
+        ? { label: 'Make top-level', icon: 'cornerDownRight', action: () => updateTask(t.id, { parent_id: null }) } : undefined,
+    ].filter((it) => it !== undefined));
+  });
 }
 
 function renderBody(root) {

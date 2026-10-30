@@ -114,3 +114,43 @@ export function sprintGoals(s) {
   return s.goals?.length
     ? `<ul class="sprint-goals">${s.goals.map((g) => `<li>${icon('target', 12)}<span>${esc(g)}</span></li>`).join('')}</ul>` : '';
 }
+
+// ---------- context menu ----------
+
+/** A right-click menu at (x, y). items: [{ label, icon, action, danger }], or null for a divider. */
+export function openContextMenu(x, y, items) {
+  closeContextMenu();
+  const menu = document.createElement('div');
+  menu.className = 'ctx-menu';
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML = items.map((it, i) => (it
+    ? `<button type="button" role="menuitem" data-i="${i}"${it.danger ? ' class="danger"' : ''}>${it.icon ? icon(it.icon, 14) : ''}${esc(it.label)}</button>`
+    : '<hr>')).join('');
+  document.body.append(menu);
+  // Keep it on screen.
+  menu.style.left = `${Math.max(8, Math.min(x, innerWidth - menu.offsetWidth - 8))}px`;
+  menu.style.top = `${Math.max(8, Math.min(y, innerHeight - menu.offsetHeight - 8))}px`;
+  menu.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-i]');
+    if (!btn) return;
+    closeContextMenu();
+    items[btn.dataset.i].action();
+  });
+  menu.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const buttons = [...menu.querySelectorAll('button')];
+    const i = buttons.indexOf(document.activeElement);
+    buttons[(i + (e.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length].focus();
+  });
+  menu.querySelector('button')?.focus();
+}
+
+export function closeContextMenu() {
+  document.querySelector('.ctx-menu')?.remove();
+}
+
+document.addEventListener('pointerdown', (e) => !e.target.closest?.('.ctx-menu') && closeContextMenu(), true);
+document.addEventListener('keydown', (e) => e.key === 'Escape' && closeContextMenu());
+window.addEventListener('resize', closeContextMenu);
+document.addEventListener('scroll', closeContextMenu, true);

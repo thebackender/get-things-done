@@ -456,6 +456,22 @@ button.more:hover:not(:disabled) { background: var(--accent); color: var(--foreg
 .list-toolbar .q { flex: 1; min-width: 160px !important; }
 .row[draggable] { -webkit-user-drag: element; }
 .row.dragging { opacity: 0.5; }
+/* Drop target while dragging a row: becomes its parent (row) or makes it top-level (group header). */
+.row.drop-into, .group h3.drop-into { box-shadow: inset 0 0 0 2px var(--sprint); background: color-mix(in srgb, var(--sprint) 8%, var(--card)); }
+
+/* Right-click menu. */
+.ctx-menu {
+  position: fixed; z-index: 300; min-width: 190px; padding: 4px;
+  display: flex; flex-direction: column;
+  background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+}
+.ctx-menu button {
+  height: 32px; justify-content: flex-start; gap: 8px; padding: 0 10px;
+  border: 0; box-shadow: none; background: transparent; font-size: 13px; font-weight: 400;
+}
+.ctx-menu button:hover, .ctx-menu button:focus-visible { background: var(--accent); box-shadow: none; }
+.ctx-menu button .i { color: var(--muted-foreground); }
+.ctx-menu hr { margin: 4px 0; border: 0; border-top: 1px solid var(--border); }
 
 /* View menu: sorting, grouping, done tasks. */
 .view-menu { position: relative; }
