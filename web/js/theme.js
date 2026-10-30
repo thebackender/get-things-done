@@ -7,7 +7,6 @@ const CACHE_KEY = 'gtd.theme';
 const media = matchMedia('(prefers-color-scheme: dark)');
 let mode = THEMES[getPref('theme')] ? getPref('theme') : 'system';
 
-export const themeMode = () => mode;
 export const isDark = () => document.documentElement.dataset.theme === 'dark';
 
 function apply() {

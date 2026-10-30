@@ -1,11 +1,9 @@
-// Settings tab: theme, and projects with their subprojects (name, color, active).
+// Projects tab: projects and their subprojects (name, color, active).
 import { store, projectList, projectById, isSelectable, createProject, updateProject, deleteProject } from '../store.js';
 import { PALETTE, OTHER_COLOR, esc, empty, freshBox, paint } from '../util.js';
 import { icon } from '../icons.js';
-import { THEMES, themeMode, setTheme } from '../theme.js';
 
 const COLORS = [...PALETTE, OTHER_COLOR];
-const THEME_ICONS = { light: 'sun', dark: 'moon', system: 'monitor' };
 const plural = (n) => `${n} task${n === 1 ? '' : 's'}`;
 const subprojectsOf = (id) => store.projects.filter((p) => p.parent_id === id);
 const taskCount = (id) => store.tasks.filter((t) => t.project_id === id).length;
@@ -35,14 +33,6 @@ export function render(view) {
   const roots = list.filter((p) => p.parent_id == null);
   root.innerHTML = `
     <div class="settings">
-      <section class="settings-card">
-        <h2>Appearance</h2>
-        <p class="hint">System follows your OS setting. The theme, filters and sorting of every tab are saved in <code>data/settings.json</code>.</p>
-        <div class="segmented" role="radiogroup" aria-label="Theme">
-          ${Object.entries(THEMES).map(([value, label]) => `<button type="button" role="radio" data-theme-mode="${value}"
-            aria-checked="${themeMode() === value}" class="${themeMode() === value ? 'on' : ''}">${icon(THEME_ICONS[value], 15)}${label}</button>`).join('')}
-        </div>
-      </section>
       <section class="settings-card">
         <h2>Projects <span class="count">${list.length}</span></h2>
         <p class="hint">
@@ -77,8 +67,6 @@ export function render(view) {
   });
 
   root.addEventListener('click', (e) => {
-    const mode = e.target.closest('[data-theme-mode]')?.dataset.themeMode;
-    if (mode) return setTheme(mode);
     const row = e.target.closest('[data-project]');
     if (!row) return;
     const p = projectById(Number(row.dataset.project));

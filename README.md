@@ -20,7 +20,7 @@ The server listens on `127.0.0.1` only, so it isn't reachable from the network.
 | Backlog | Tasks without a sprint. Drag a task into a sprint and its unfinished subtasks come along. Create, start and close sprints here |
 | Graph | Tasks as nodes. Solid line: subtask. Dashed arrow A ⇢ B: A blocks B |
 | Stats | Summary, done per week, sprint burndown, projects, priorities, velocity, goals |
-| Settings | Theme (light, dark, system). Projects and subprojects: create, rename, delete, pick a color, mark active or inactive |
+| Projects | Projects and subprojects: create, rename, delete, pick a color, mark active or inactive |
 
 ### Calendar
 
@@ -89,7 +89,7 @@ It is separate from `planner.json`: no undo, no history, no backups. Delete it t
 }
 ```
 
-`theme` is `light`, `dark` or `system` (follows the OS). The ☾/☀ button in the header switches between light and dark.
+`theme` is `light`, `dark` or `system` (follows the OS, the default). The ☾/☀ button in the header switches between light and dark; to go back to `system`, set it here or delete the key.
 
 ## Layout
 
@@ -104,5 +104,5 @@ web/js/theme.js      light / dark theme
 web/js/store.js      state and API calls
 web/js/editor.js     task and sprint dialogs
 web/js/components.js cards, badges, drag and drop
-web/js/views/*.js    one file per tab; tasks.js puts list.js and calendar.js side by side; settings.js manages projects
+web/js/views/*.js    one file per tab; tasks.js puts list.js and calendar.js side by side
 ```
