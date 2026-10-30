@@ -1,7 +1,7 @@
 // Graph tab: the same tasks as the list (Sprint / All, Hide done), drawn as cards with their links.
 // Links go left to right: parent → subtask (gray line), blocker → blocked task (orange dashed arrow).
 // Layered layout: each group of linked tasks is laid out in columns by depth, groups are packed into rows.
-import { store, taskById, activeSprint, updateTask } from '../store.js';
+import { store, taskById, descendants, activeSprint, updateTask } from '../store.js';
 import { openTaskEditor } from '../editor.js';
 import { projectChip, metaBadges, doingBadge, openContextMenu, taskMenuItems } from '../components.js';
 import { esc, prioIcon, prioClass, prioName, empty, freshBox, trunc, toast } from '../util.js';
@@ -30,23 +30,31 @@ const MARGIN = 10; // the smallest gap between two cards: cards never overlap
 
 const overlaps = (a, b) => a.x < b.x + W + MARGIN && b.x < a.x + W + MARGIN && a.y < b.y + H + MARGIN && b.y < a.y + H + MARGIN;
 
-/** The free spot nearest to p (top-left corner of a card), given the cards already there. */
-function freeSpot(p, others) {
-  const free = (q) => others.every((o) => !overlaps(q, o));
-  if (free(p)) return p;
+/**
+ * The smallest shift {x, y} that puts all the cards at ps (top-left corners; several when a selection moves)
+ * on free spots, given the cards already there. {x: 0, y: 0} if they are free as they are.
+ */
+function freeShift(ps, others) {
+  const free = (dx, dy) => ps.every((p) => others.every((o) => !overlaps({ x: p.x + dx, y: p.y + dy }, o)));
+  if (free(0, 0)) return { x: 0, y: 0 };
   const step = 2 * SNAP;
-  // Look on growing square rings around p; within a ring take the closest free spot.
+  // Look on growing square rings; within a ring take the closest free shift.
   for (let r = step; r <= 4000; r += step) {
     let best = null, bestD = Infinity;
     for (let i = -r; i <= r; i += step) {
-      for (const q of [{ x: p.x + i, y: p.y - r }, { x: p.x + i, y: p.y + r }, { x: p.x - r, y: p.y + i }, { x: p.x + r, y: p.y + i }]) {
-        const d = Math.hypot(q.x - p.x, q.y - p.y);
-        if (d < bestD && free(q)) { best = q; bestD = d; }
+      for (const [dx, dy] of [[i, -r], [i, r], [-r, i], [r, i]]) {
+        const d = Math.hypot(dx, dy);
+        if (d < bestD && free(dx, dy)) { best = { x: dx, y: dy }; bestD = d; }
       }
     }
     if (best) return best;
   }
-  return p;
+  return { x: 0, y: 0 };
+}
+/** The free spot nearest to p, given the cards already there. */
+function freeSpot(p, others) {
+  const s = freeShift([p], others);
+  return s.x || s.y ? { x: p.x + s.x, y: p.y + s.y } : p;
 }
 let camera = null; // {x, y, k}: pan and zoom, kept across re-renders
 let q = ''; // search; not saved
@@ -55,8 +63,17 @@ let seen = null;
 const fresh = new Set();
 let fitCurrent = null; // Fit for the graph on screen (Esc)
 
+// Cards picked with Ctrl + click (Cmd on a Mac): dragging one of them moves them all. Kept across re-renders.
+const selected = new Set();
+let showSelection = null; // updates the cards on screen after the selection changes
+
 export const newTaskPreset = () => listPreset();
-export const onEscape = () => fitCurrent?.();
+/** Esc clears the selection first, then fits the graph. */
+export const onEscape = () => {
+  if (!selected.size) return fitCurrent?.();
+  selected.clear();
+  showSelection?.();
+};
 // After folding/unfolding, keep the clicked card at the same spot on screen: {id, x, y} in screen pixels.
 let anchor = null;
 
@@ -206,13 +223,14 @@ const HELP = [
   '− on a card folds its subtasks.',
   'N creates a task (it shows here right away, ready to link); Esc fits the whole graph.',
   'Drag a card to move it (Reset card positions under View puts them back); drag the background or scroll to move the view; Ctrl + scroll to zoom.',
+  'Ctrl + click cards to select several (on a parent: with its subtasks), then drag one of them to move them together; Esc or a click on the background clears the selection.',
 ].join('\n');
 
 const short = (t) => `"${trunc(t.title, 32)}"`;
 
 function nodeHTML(t, p) {
   const cls = [`st-${t.status}`, `prio-${prioClass(t.priority)}`, matches(t) && 'match'].filter(Boolean).join(' ');
-  return `<foreignObject x="${p.x}" y="${p.y}" width="${W}" height="${H}" data-node="${t.id}">
+  return `<foreignObject x="${p.x}" y="${p.y}" width="${W}" height="${H}" data-node="${t.id}"${selected.has(t.id) ? ' class="selected"' : ''}>
     <div xmlns="http://www.w3.org/1999/xhtml" class="gnode ${cls}" title="${esc(t.title)} · ${prioName(t.priority)}">
       <div class="gnode-top">${prioIcon(t.priority)}<span class="title">${esc(t.title)}</span></div>
       <div class="gnode-meta">${doingBadge(t)}${metaBadges(t)}${projectChip(t.project_id)}</div>
@@ -277,7 +295,7 @@ export function render(view, openMenu = null) {
     <div class="graph-wrap">
       <svg class="graph">
         <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>
-        <g class="viewport"><rect class="drop-ghost" width="${W}" height="${H}" rx="6" visibility="hidden"/><g class="edges"></g><g class="nodes"></g><g class="folds"></g><g class="handles"></g></g>
+        <g class="viewport"><g class="ghosts"></g><g class="edges"></g><g class="nodes"></g><g class="folds"></g><g class="handles"></g></g>
       </svg>
       ${nodes.length ? '' : empty(opts.onlyLinked ? 'No links between these tasks. Set a parent or "Blocked by" in the task editor, or turn off "Linked tasks only" under View.' : 'No tasks.')}
     </div>`;
@@ -295,6 +313,7 @@ export function render(view, openMenu = null) {
     for (const t of nodes) if (opts.positions[t.id]) put(t.id, { ...opts.positions[t.id] });
     for (const t of nodes) if (!opts.positions[t.id]) put(t.id, pos.get(t.id));
   }
+  for (const id of selected) if (!pos.has(id)) selected.delete(id); // hidden or deleted cards drop out
   const bounds = () => {
     const ps = [...pos.values()];
     if (!ps.length) return { x: 0, y: 0, w: 1, h: 1 };
@@ -321,6 +340,10 @@ export function render(view, openMenu = null) {
     root.querySelector('.folds').innerHTML = nodes.filter((t) => hasKids.has(t.id))
       .map((t) => foldHTML(t.id, pos.get(t.id), isCollapsed(t.id), kidCount(t.id), kidsOnLeft(t.id))).join('');
   }
+
+  /** A card and its subtasks on screen (all levels): Ctrl + click on a parent picks the whole branch. */
+  const branch = (id) => [id, ...descendants(id).map((t) => t.id).filter((i) => pos.has(i))];
+  showSelection = () => root.querySelectorAll('[data-node]').forEach((el) => el.classList.toggle('selected', selected.has(Number(el.dataset.node))));
 
   // ---------- camera ----------
   const apply = () => viewport.setAttribute('transform', `translate(${camera.x},${camera.y}) scale(${camera.k})`);
@@ -433,10 +456,9 @@ export function render(view, openMenu = null) {
     const hit = e.target.closest('.edge-hit');
     drag = {
       id: node ? Number(node.dataset.node) : null, fold: fold ? Number(fold.dataset.fold) : null,
-      link: handle ? Number(handle.dataset.link) : null, hit,
+      link: handle ? Number(handle.dataset.link) : null, hit, multi: e.ctrlKey || e.metaKey,
       sx: e.clientX, sy: e.clientY, cx: camera.x, cy: camera.y, moved: false,
     };
-    if (drag.id != null) drag.start = { ...pos.get(drag.id) }; // dragging a card moves it
     if (drag.link != null) {
       // Draw a blocker link: an orange arrow follows the pointer until it is dropped on a card.
       capture(e);
@@ -466,21 +488,38 @@ export function render(view, openMenu = null) {
       capture(e);
       svg.classList.add('panning');
       if (drag.id != null) {
-        const fo = root.querySelector(`[data-node="${drag.id}"]`);
-        fo.classList.add('moving');
-        fo.parentNode.append(fo); // on top of the other cards while it moves
+        // A selected card brings the whole selection along; Ctrl + drag adds the card to it first.
+        // Dragging a card that isn't selected moves just that card and clears the selection.
+        if (drag.multi) branch(drag.id).forEach((id) => selected.add(id));
+        else if (!selected.has(drag.id)) selected.clear();
+        showSelection();
+        drag.group = selected.has(drag.id) ? [...selected] : [drag.id];
+        drag.starts = new Map(drag.group.map((id) => [id, { ...pos.get(id) }]));
+        drag.others = [...pos].filter(([id]) => !drag.starts.has(id)).map(([, q]) => q);
+        for (const id of drag.group) {
+          const fo = root.querySelector(`[data-node="${id}"]`);
+          fo.classList.add('moving');
+          fo.parentNode.append(fo); // on top of the other cards while they move
+        }
+        root.querySelector('.ghosts').innerHTML = drag.group.map((id) =>
+          `<rect class="drop-ghost" data-ghost="${id}" width="${W}" height="${H}" rx="6" visibility="hidden"/>`).join('');
       }
     }
     if (drag.id != null) {
       const snap = (v) => Math.round(v / SNAP) * SNAP;
-      const p = { x: snap(drag.start.x + mx / camera.k), y: snap(drag.start.y + my / camera.k) };
-      moveCard(drag.id, p.x, p.y);
-      // Where it will land if dropped here: the nearest spot that doesn't overlap another card.
-      drag.landing = freeSpot(p, [...pos].filter(([id]) => id !== drag.id).map(([, q]) => q));
-      const ghost = root.querySelector('.drop-ghost');
-      const show = drag.landing !== p;
-      ghost.setAttribute('visibility', show ? 'visible' : 'hidden');
-      if (show) { ghost.setAttribute('x', drag.landing.x); ghost.setAttribute('y', drag.landing.y); }
+      const s0 = drag.starts.get(drag.id);
+      const dx = snap(s0.x + mx / camera.k) - s0.x, dy = snap(s0.y + my / camera.k) - s0.y;
+      const ps = drag.group.map((id) => ({ x: drag.starts.get(id).x + dx, y: drag.starts.get(id).y + dy }));
+      drag.group.forEach((id, i) => moveCard(id, ps[i].x, ps[i].y));
+      // Where they will land if dropped here: the nearest spot where no card overlaps another (the group keeps its shape).
+      const shift = freeShift(ps, drag.others);
+      const show = shift.x !== 0 || shift.y !== 0;
+      drag.landing = drag.group.map((id, i) => ({ id, x: ps[i].x + shift.x, y: ps[i].y + shift.y }));
+      for (const l of drag.landing) {
+        const ghost = root.querySelector(`[data-ghost="${l.id}"]`);
+        ghost.setAttribute('visibility', show ? 'visible' : 'hidden');
+        if (show) { ghost.setAttribute('x', l.x); ghost.setAttribute('y', l.y); }
+      }
       return;
     }
     camera.x = drag.cx + mx;
@@ -500,10 +539,10 @@ export function render(view, openMenu = null) {
     }
     const click = drag && !drag.moved ? drag : null;
     if (drag?.moved && drag.id != null) {
-      root.querySelector(`[data-node="${drag.id}"]`)?.classList.remove('moving');
-      root.querySelector('.drop-ghost').setAttribute('visibility', 'hidden');
-      if (drag.landing) moveCard(drag.id, drag.landing.x, drag.landing.y);
-      opts.positions[drag.id] = pos.get(drag.id);
+      root.querySelectorAll('.moving').forEach((el) => el.classList.remove('moving'));
+      root.querySelector('.ghosts').innerHTML = '';
+      for (const l of drag.landing ?? []) moveCard(l.id, l.x, l.y);
+      for (const id of drag.group) opts.positions[id] = pos.get(id);
       saveOpts();
     }
     svg.classList.remove('panning');
@@ -515,13 +554,23 @@ export function render(view, openMenu = null) {
       toggleCollapsed(click.fold);
       return render(view);
     }
+    if (click?.id != null && click.multi) {
+      // Ctrl + click picks or unpicks a card, together with its subtasks.
+      const on = !selected.has(click.id);
+      for (const id of branch(click.id)) on ? selected.add(id) : selected.delete(id);
+      return showSelection();
+    }
+    if (click && selected.size) { // a plain click on a card or the background ends the selection
+      selected.clear();
+      showSelection();
+    }
     if (click?.id != null) openTaskEditor(taskById(click.id));
   };
   svg.addEventListener('pointerup', endDrag);
   svg.addEventListener('pointercancel', () => {
-    if (drag?.moved && drag.id != null) moveCard(drag.id, drag.start.x, drag.start.y); // put it back
-    root.querySelector('.moving')?.classList.remove('moving');
-    root.querySelector('.drop-ghost')?.setAttribute('visibility', 'hidden');
+    if (drag?.moved && drag.id != null) for (const [id, p] of drag.starts) moveCard(id, p.x, p.y); // put them back
+    root.querySelectorAll('.moving').forEach((el) => el.classList.remove('moving'));
+    root.querySelector('.ghosts').innerHTML = '';
     drag = null;
     svg.classList.remove('panning', 'linking');
     root.querySelector('.temp')?.remove();

@@ -604,6 +604,8 @@ svg.linking, svg.linking * { cursor: crosshair !important; }
 .gnode { cursor: grab; }
 /* Where a dragged card will land when its current spot overlaps another card. */
 .drop-ghost { fill: color-mix(in srgb, var(--sprint) 6%, transparent); stroke: var(--sprint); stroke-width: 1.5; stroke-dasharray: 6 4; pointer-events: none; }
+/* Picked with Ctrl + click: a ring inside the card (the card's own shadow carries the priority stripe). */
+[data-node].selected .gnode { border-color: var(--sprint); outline: 2px solid var(--sprint); outline-offset: -2px; }
 [data-node].moving .gnode { cursor: grabbing; border-color: var(--subtle); filter: drop-shadow(0 8px 16px rgb(0 0 0 / 0.16)); }
 .view-menu .reset-layout { height: 30px; justify-content: flex-start; padding: 0 6px; font-size: 13px; color: var(--muted-foreground); border-top: 1px solid var(--border); border-radius: 0; }
 .gnode-top { display: flex; align-items: center; gap: 6px; font-weight: 500; }
