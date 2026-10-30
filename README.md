@@ -19,7 +19,7 @@ The server listens on `127.0.0.1` only, so it isn't reachable from the network.
 | List | Task tree. Search, sort, group by project, status or sprint, show done tasks |
 | Sprint | Board for the active sprint: To do / In progress / Waiting / Done. Drag cards between columns |
 | Backlog | Tasks without a sprint. Drag a task into a sprint and its unfinished subtasks come along. Create, start and close sprints here |
-| Calendar | Tasks on their due dates. Click a day to add a task, drag a task to move its due date |
+| Calendar | Both views start at the active sprint (at today if no sprint is active); the Sprint button brings you back. Year view: 12 months from the sprint's month, a dot marks days with tasks (red: overdue, orange: urgent); click a day to see its tasks. Month view: 5 weeks from the sprint's first week, or the whole sprint if it's longer; tasks on their due dates (up to 3 per day, "+N more" opens the rest), every other month tinted; drag a task to move its due date. Click an empty day to add a task |
 | Graph | Tasks as nodes. Solid line: subtask. Dashed arrow A ⇢ B: A blocks B |
 | Stats | Summary, done per week, sprint burndown, projects, priorities, velocity, goals |
 | Settings | Theme (light, dark, system). Projects and subprojects: create, rename, delete, pick a color, mark active or inactive |
@@ -74,7 +74,7 @@ Everywhere in the UI a task's project shows as `Project` or `Project:Subproject`
 ### UI settings
 
 `data/settings.json` keeps the theme and each tab's view options: sorting, grouping, "show done" and collapsed tasks in List,
-the checkboxes in Calendar and Graph, the sprint picked on the board, the goal picked in Stats. The page saves it as you change things.
+the year/month view and checkbox in Calendar, the checkboxes in Graph, the sprint picked on the board, the goal picked in Stats. The page saves it as you change things.
 It is separate from `planner.json`: no undo, no history, no backups. Delete it to reset everything to defaults.
 
 ```json

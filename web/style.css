@@ -51,6 +51,9 @@
   --crit-text: #991b1b;
   --highest-bg: #fff7f7;
   --highest-bg-hover: #fef2f2;
+  --cal-accent: #e5484d; /* month names and today in the calendar */
+  --month-alt: #f5f5f6; /* every other month in the month view */
+  --sprint: #3b82f6; /* active sprint days in the month view */
   color-scheme: light;
   font-family: "Inter", "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
   font-size: 14px;
@@ -106,6 +109,9 @@
   --crit-text: #fca5a5;
   --highest-bg: rgb(239 68 68 / 0.06);
   --highest-bg-hover: rgb(239 68 68 / 0.12);
+  --cal-accent: #f2555a;
+  --month-alt: #18181b;
+  --sprint: #60a5fa;
 }
 .theme-switching, .theme-switching * { transition: none !important; }
 /* Header theme button: moon on light, sun on dark. */
@@ -399,31 +405,97 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
   overflow: hidden; box-shadow: var(--shadow-xs);
 }
 .dow { background: var(--surface-2); padding: 8px 10px; font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
-.day { background: var(--card); min-height: 116px; padding: 6px; cursor: pointer; overflow: hidden; transition: background-color 0.1s; }
-.day:hover { background: var(--hover); }
-.day.weekend { background: var(--surface-2); }
-.day.other { background: var(--hover); }
-.day.other .day-num { color: var(--faint); }
-.day.in-sprint { box-shadow: inset 0 2px 0 var(--primary); }
-.day-num {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 24px; height: 24px; margin-bottom: 4px; padding: 0 6px;
-  font-size: 12px; font-weight: 500; color: var(--foreground-2); border-radius: 999px;
+/* Square cells with up to 3 tasks; see .cal-wrap.month for the size. */
+.day {
+  aspect-ratio: 1; min-width: 0; padding: 4px 5px;
+  background: var(--card); cursor: pointer; overflow: hidden;
 }
-.day.today .day-num { background: var(--primary); color: var(--primary-foreground); }
+.day.alt { background: var(--month-alt); }
+.day:hover { outline: 1px solid var(--border-strong); outline-offset: -1px; }
+.day.in-sprint { box-shadow: inset 0 2px 0 var(--sprint); }
+.day-num { display: flex; align-items: center; gap: 4px; height: 20px; margin-bottom: 2px; font-size: 12px; font-weight: 500; color: var(--foreground-2); }
+.day-num .n { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; border-radius: 999px; }
+.day-num .mon { font-weight: 700; color: var(--cal-accent); }
+.day.weekend .day-num .n, .day.past .day-num .n { color: var(--subtle); }
+.day.today .day-num .n { padding: 0 5px; background: var(--cal-accent); color: #fff; font-weight: 700; }
 .cal-task {
-  font-size: 12px; line-height: 1.4;
-  padding: 3px 6px; margin-bottom: 3px;
-  border-left: 3px solid var(--c);
-  background: var(--muted); border-radius: 4px;
+  font-size: 12px; line-height: 18px;
+  padding: 0 5px; margin-bottom: 2px;
+  border: 1px solid var(--border); border-left: 3px solid var(--c);
+  background: var(--background); border-radius: 4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   cursor: grab;
 }
+button.more {
+  height: 18px; padding: 0 5px; border: 0; background: none; box-shadow: none;
+  font-size: 11px; font-weight: 500; color: var(--muted-foreground);
+}
+button.more:hover:not(:disabled) { background: var(--accent); color: var(--foreground); }
 .cal-task.st-done { opacity: 0.55; text-decoration: line-through; }
 .cal-task.overdue { background: var(--destructive-bg); color: var(--destructive); }
 .overdue-icon { margin-right: 3px; vertical-align: -2px; }
 .legend-sprint { display: inline-flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 13px; }
-.legend-sprint i { width: 18px; height: 2px; background: var(--primary); display: inline-block; }
+.legend-sprint i { width: 18px; height: 2px; background: var(--sprint); display: inline-block; }
+.view-calendar { position: relative; } /* anchor for the day popover */
+/* Month view: square cells. The width follows the window height, so every week fits without scrolling. */
+.cal-wrap.month { max-width: clamp(630px, calc((100vh - 270px) / var(--weeks, 5) * 7), 1000px); }
+.cal-heading { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+.nav-group { display: inline-flex; align-items: center; gap: 4px; }
+/* The year view marks sprint days with a gray band, not a blue line. */
+.cal-wrap.year .legend-sprint i { width: 16px; height: 10px; border-radius: 2px; background: var(--muted); }
+.cal-foot { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 13px; }
+
+/* Year view: twelve mini months, Apple Calendar style. */
+.year-grid {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px 48px;
+  padding: 18px 28px 22px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-xs);
+}
+button.mini-title {
+  height: auto; padding: 0; margin: 0 0 8px; border: 0; background: none; box-shadow: none;
+  font-size: 17px; font-weight: 600; color: var(--cal-accent);
+}
+button.mini-title:hover:not(:disabled) { background: none; text-decoration: underline; text-underline-offset: 4px; }
+.mini-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 1px; }
+.mini-dow { padding-bottom: 4px; text-align: center; font-size: 11px; font-weight: 500; color: var(--muted-foreground); }
+.mini-day {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  height: 25px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none;
+  font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--foreground);
+}
+.mini-day .n { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; }
+button.mini-day:hover:not(:disabled), button.mini-day.open { background: transparent; }
+button.mini-day:hover .n, button.mini-day.open .n { background: var(--accent); }
+.mini-day.weekend { color: var(--muted-foreground); }
+.mini-day.other { color: var(--faint); font-weight: 400; }
+.mini-day.past { color: var(--subtle); font-weight: 400; }
+.mini-year { font-size: 13px; font-weight: 500; color: var(--muted-foreground); }
+.mini-day.in-sprint { background: var(--muted); }
+button.mini-day.in-sprint:hover:not(:disabled) { background: var(--muted); }
+.mini-day.today .n, button.mini-day.today:hover .n { background: var(--cal-accent); color: #fff; font-weight: 700; }
+.mini-dot {
+  position: absolute; left: 50%; bottom: 0; width: 4px; height: 4px; margin-left: -2px;
+  border-radius: 50%; background: var(--foreground-2);
+}
+.mini-dot.urgent { background: #f97316; }
+.mini-dot.overdue { background: var(--destructive); }
+.mini-dot.done { background: var(--faint); }
+
+/* Tasks of one day, opened from the year view. */
+.day-pop {
+  position: absolute; z-index: 30; width: 300px; padding: 6px;
+  background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+}
+.day-pop header { display: flex; justify-content: space-between; padding: 4px 8px 6px; font-size: 13px; }
+.day-pop ul { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow: auto; }
+button.pop-task, .day-pop button.add {
+  width: 100%; height: 32px; justify-content: flex-start; gap: 6px; padding: 0 8px;
+  border: 0; box-shadow: none; background: transparent; font-size: 13px; font-weight: 400;
+}
+.pop-task .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.pop-task.st-done .t { text-decoration: line-through; color: var(--muted-foreground); }
+.pop-task.overdue .t { color: var(--destructive); }
+.day-pop button.add { margin-top: 4px; border-top: 1px solid var(--border); border-radius: 0 0 var(--radius-sm) var(--radius-sm); color: var(--muted-foreground); }
 
 /* ---------- graph ---------- */
 
@@ -646,7 +718,9 @@ dialog::backdrop { background: var(--overlay); }
 #toast.show { opacity: 1; transform: translateY(0); }
 #toast.error { background: var(--destructive-bg); border-color: var(--destructive-border); color: var(--destructive); }
 
+@media (max-width: 1150px) { .year-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 32px; } }
 @media (max-width: 900px) {
+  .year-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px; gap: 20px 24px; }
   .topbar { height: auto; padding: 10px 16px; flex-wrap: wrap; }
   main { padding: 16px; }
   .board { grid-template-columns: 1fr 1fr; }
