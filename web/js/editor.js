@@ -7,7 +7,7 @@ import {
   PRIORITIES, STATUSES, esc, opt, prioIcon, today, addDays, fmtDate, fmtTs, fmtNum, statusName, prioName, toast,
   dateInput, bindDateInputs, readDate,
 } from './util.js';
-import { comboHTML, bindCombos } from './combo.js';
+import { comboHTML, bindCombos, pickerHTML, bindPickers } from './combo.js';
 import { icon } from './icons.js';
 
 const dlg = document.getElementById('dialog');
@@ -23,7 +23,7 @@ dlg.addEventListener('cancel', (e) => {
   e.preventDefault();
   // Esc while a searchable dropdown is open closes just that dropdown.
   const openList = dlg.querySelector('.combo-list:not([hidden])');
-  if (openList) return openList.closest('.combo').querySelector('.combo-input').blur();
+  if (openList) return openList.parentElement.querySelector('.combo-input, .picker-btn').blur();
   requestClose();
 });
 
@@ -134,7 +134,7 @@ export function openTaskEditor(task = null, preset = {}) {
     <input name="title" class="title-input" placeholder="What needs to be done?" value="${esc(t.title)}" autocomplete="off" autofocus>
     <div class="grid">
       <label>Status<select name="status">${STATUSES.map((s) => opt(s.value, s.name, t.status)).join('')}</select></label>
-      <label>Priority<span class="with-icon"><span class="prio-preview">${prioIcon(t.priority)}</span><select name="priority">${PRIORITIES.map((p) => opt(p.value, p.name, t.priority)).join('')}</select></span></label>
+      <div class="field">Priority${pickerHTML('priority', PRIORITIES.map((p) => ({ value: p.value, label: p.name, icon: prioIcon(p.value) })), t.priority, 'Priority')}</div>
       <div class="field">Project
         <select name="project_id">
           <option value="">— none —</option>
@@ -188,6 +188,7 @@ export function openTaskEditor(task = null, preset = {}) {
   const el = form.elements;
   bindDateInputs(form);
   bindCombos(form);
+  bindPickers(form);
   const progressBox = form.querySelector('.progress-box');
 
   function renderProgress() {
@@ -352,7 +353,6 @@ export function openTaskEditor(task = null, preset = {}) {
 
   form.onchange = (e) => {
     if (e.target.name === 'status') form.querySelector('.waiting-row').hidden = e.target.value !== 'waiting';
-    if (e.target.name === 'priority') form.querySelector('.prio-preview').innerHTML = prioIcon(Number(e.target.value));
     if (e.target === projectSelect) {
       if (projectSelect.value === NEW_PROJECT) {
         projectSelect.value = lastProject;

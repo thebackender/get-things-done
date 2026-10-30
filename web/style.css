@@ -167,6 +167,7 @@ button.icon {
 }
 button.icon:hover:not(:disabled) { background: var(--accent); color: var(--foreground); }
 
+:root { --select-arrows: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5M7 9l5-5 5 5'/%3E%3C/svg%3E"); }
 input:not([type="checkbox"]):not([type="hidden"]), select, textarea {
   height: 36px; padding: 0 12px;
   border: 1px solid var(--input); border-radius: var(--radius-sm);
@@ -179,7 +180,7 @@ textarea { height: auto; padding: 8px 12px; resize: vertical; width: 100%; }
 select {
   appearance: none; -webkit-appearance: none;
   padding-right: 32px; cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5M7 9l5-5 5 5'/%3E%3C/svg%3E");
+  background-image: var(--select-arrows);
   background-repeat: no-repeat; background-position: right 10px center;
 }
 input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
@@ -333,8 +334,6 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
 .cal-task.prio-highest { background: var(--highest-bg); font-weight: 500; }
 .cal-task.st-done.prio-critical, .cal-task.st-done.prio-highest { background: var(--muted); color: inherit; font-weight: normal; }
 
-.with-icon { display: flex; align-items: center; gap: 8px; }
-.with-icon select { flex: 1; min-width: 0; }
 
 /* ---------- cards (board, backlog) ---------- */
 
@@ -683,6 +682,16 @@ code {
 .combo-list li { padding: 6px 8px; border-radius: 4px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .combo-list li.active, .combo-list li:hover { background: var(--accent); }
 .combo-list li.none { color: var(--muted-foreground); }
+/* Picker (combo.js): looks like a <select>, its options have icons. */
+.picker { position: relative; }
+.picker-btn {
+  width: 100%; justify-content: flex-start; gap: 8px; padding: 0 32px 0 12px;
+  border-color: var(--input); font-weight: 400;
+  background: var(--background) var(--select-arrows) no-repeat right 10px center;
+}
+.picker-btn:hover:not(:disabled) { background: var(--background) var(--select-arrows) no-repeat right 10px center; }
+.picker-list li { display: flex; align-items: center; gap: 8px; }
+.picker-list li[aria-selected="true"] { font-weight: 500; }
 .combo-list li.combo-empty { color: var(--muted-foreground); cursor: default; background: none; text-align: center; padding: 10px; }
 
 /* ---------- dialog ---------- */

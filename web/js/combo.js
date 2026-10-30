@@ -1,6 +1,7 @@
 // Searchable dropdown ("combobox"): a text box that filters a list as you type.
 // The chosen value lives in a hidden input with the given name, so forms read it like a <select>.
 import { esc } from './util.js';
+import { icon } from './icons.js';
 
 /**
  * items: [{value, label, hint?}]; hint is shown greyed out and is searchable too.
@@ -102,4 +103,84 @@ function setup(box) {
     if (li) choose(li);
   });
   input.addEventListener('blur', () => { if (!list.hidden) close(); });
+}
+
+// ---------- picker: a <select> look-alike whose options carry an icon ----------
+
+/**
+ * items: [{value, label, icon}] (icon is HTML). The value lives in a hidden input with the given name.
+ * Put it in a <div class="field">, not a <label>: a label would pass clicks on the list back to the button.
+ */
+export function pickerHTML(name, items, value, ariaLabel = name) {
+  const cur = items.find((i) => String(i.value) === String(value)) ?? items[0];
+  return `<div class="picker">
+    <input type="hidden" name="${name}" value="${esc(cur.value)}">
+    <button type="button" class="picker-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="${esc(ariaLabel)}">${cur.icon}<span>${esc(cur.label)}</span></button>
+    <ul class="combo-list picker-list" role="listbox" hidden>
+      ${items.map((i) => `<li role="option" data-value="${esc(i.value)}" aria-selected="${i === cur}">${i.icon}<span>${esc(i.label)}</span></li>`).join('')}
+    </ul>
+  </div>`;
+}
+
+/** Wire up every picker inside root. Call once after the markup is inserted. */
+export function bindPickers(root) {
+  root.querySelectorAll('.picker').forEach(setupPicker);
+}
+
+function setupPicker(box) {
+  const hidden = box.querySelector('input[type=hidden]');
+  const btn = box.querySelector('.picker-btn');
+  const list = box.querySelector('.picker-list');
+  const items = [...list.querySelectorAll('li')];
+  let active = -1;
+
+  function highlight(i) {
+    active = (i + items.length) % items.length;
+    items.forEach((li, n) => li.classList.toggle('active', n === active));
+    items[active].scrollIntoView({ block: 'nearest' });
+  }
+  function open() {
+    list.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    highlight(items.findIndex((li) => li.dataset.value === hidden.value));
+  }
+  function close() {
+    list.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  }
+  function choose(li) {
+    close();
+    if (li.dataset.value === hidden.value) return;
+    hidden.value = li.dataset.value;
+    items.forEach((x) => x.setAttribute('aria-selected', x === li));
+    btn.innerHTML = li.innerHTML;
+    hidden.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  btn.addEventListener('click', () => (list.hidden ? open() : close()));
+  btn.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (list.hidden) open();
+      else highlight(active + (e.key === 'ArrowDown' ? 1 : -1));
+    } else if ((e.key === 'Enter' || e.key === ' ') && !list.hidden) {
+      e.preventDefault(); // pick, don't submit the form or re-click the button
+      choose(items[active]);
+    } else if (e.key === 'Escape' && !list.hidden) {
+      e.preventDefault(); // close the list, not the whole dialog
+      e.stopPropagation();
+      close();
+    }
+  });
+  // mousedown (not click) so the choice lands before the button loses focus
+  list.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const li = e.target.closest('li');
+    if (li) choose(li);
+  });
+  list.addEventListener('mousemove', (e) => {
+    const i = items.indexOf(e.target.closest('li'));
+    if (i >= 0 && i !== active) highlight(i);
+  });
+  btn.addEventListener('blur', close);
 }
