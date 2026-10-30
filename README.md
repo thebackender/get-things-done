@@ -119,7 +119,7 @@ The server checks these on every change; the UI stops typing at the same length 
 | Critical / Highest / High tasks | 2 / 3 / 3 per sprint (done ones count too; Medium and lower, the backlog and past sprints have no limit) |
 | One API request | 1 MB |
 
-A full priority can't be picked in the task editor (it shows how many slots a sprint has left), and a task can't be moved into a sprint where its priority is full. Tasks that were over the limit before keep their priority. The sprint line above the task list shows the counts, e.g. ★ 1/2.
+A full priority can't be picked in the task editor (it shows how many slots a sprint has left), and a task can't be moved into a sprint where its priority is full. Tasks that were over the limit before keep their priority.
 
 ## Layout
 
