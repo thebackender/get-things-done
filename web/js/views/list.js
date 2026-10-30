@@ -37,6 +37,20 @@ const scopeSprint = () => (state.scope === 'sprint' ? activeSprint() : null);
 /** The Sprint / All filter, shared with the calendar. */
 /** What the list shows: the scope, minus done tasks when "Hide done" is on. The calendar uses scopeFilter only. */
 const shown = (t) => scopeFilter(t) && !(state.hideDone && t.status === 'done');
+
+// The Graph tab shows the same tasks as the list and shares these two options with it.
+export const listFilter = (t) => shown(t);
+export const listView = () => ({ scope: state.scope, hideDone: state.hideDone });
+/** Collapsed tasks (their subtasks are hidden) are shared with the Graph tab too. */
+export const isCollapsed = (id) => state.collapsed.includes(id);
+export function toggleCollapsed(id) {
+  state.collapsed = isCollapsed(id) ? state.collapsed.filter((x) => x !== id) : [...state.collapsed, id];
+  persist();
+}
+export function setListView(patch) {
+  Object.assign(state, patch);
+  persist();
+}
 export function scopeFilter(t) {
   const sprint = scopeSprint();
   return !sprint || t.sprint_id === sprint.id;

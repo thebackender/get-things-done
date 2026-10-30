@@ -308,17 +308,17 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
 .row.prio-high { box-shadow: inset 3px 0 0 #fb923c; }
 .row.prio-lowest .title { color: var(--muted-foreground); }
 
-.card.prio-critical { box-shadow: inset 3px 0 0 #dc2626, var(--shadow-xs); background: var(--crit-card-bg); }
-.card.prio-critical .card-title { font-weight: 600; }
-.card.prio-highest { box-shadow: inset 3px 0 0 #ef4444, var(--shadow-xs); }
-.card.prio-highest .card-title { font-weight: 500; }
-.card.prio-high { box-shadow: inset 3px 0 0 #fb923c, var(--shadow-xs); }
-.card.prio-lowest .card-title { color: var(--muted-foreground); }
+.card.prio-critical, .gnode.prio-critical { box-shadow: inset 3px 0 0 #dc2626, var(--shadow-xs); background: var(--crit-card-bg); }
+.card.prio-critical .card-title, .gnode.prio-critical .title { font-weight: 600; }
+.card.prio-highest, .gnode.prio-highest { box-shadow: inset 3px 0 0 #ef4444, var(--shadow-xs); }
+.card.prio-highest .card-title, .gnode.prio-highest .title { font-weight: 500; }
+.card.prio-high, .gnode.prio-high { box-shadow: inset 3px 0 0 #fb923c, var(--shadow-xs); }
+.card.prio-lowest .card-title, .gnode.prio-lowest .title { color: var(--muted-foreground); }
 
 /* Done tasks stop shouting. */
 .row.st-done, .row.st-done:hover { background: var(--card); box-shadow: none; }
-.row.st-done .title, .card.st-done .card-title { font-weight: normal; }
-.card.st-done { box-shadow: var(--shadow-xs); background: var(--card); }
+.row.st-done .title, .card.st-done .card-title, .gnode.st-done .title { font-weight: normal; }
+.card.st-done, .gnode.st-done { box-shadow: var(--shadow-xs); background: var(--card); }
 .st-done .prio-icon { color: var(--faint); }
 
 .cal-task .prio-icon { width: 13px; height: 13px; margin-right: 4px; vertical-align: -2px; }
@@ -326,7 +326,6 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
 .cal-task.prio-critical { background: var(--crit-bg); color: var(--crit-text); font-weight: 600; }
 .cal-task.prio-highest { background: var(--highest-bg); font-weight: 500; }
 .cal-task.st-done.prio-critical, .cal-task.st-done.prio-highest { background: var(--muted); color: inherit; font-weight: normal; }
-.node.prio-critical circle:not(.hit) { stroke: #dc2626; stroke-width: 3; }
 
 .with-icon { display: flex; align-items: center; gap: 8px; }
 .with-icon select { flex: 1; min-width: 0; }
@@ -536,26 +535,47 @@ button.pop-task, .day-pop button.add {
   background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 20px 20px;
 }
 .graph-wrap .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-svg.graph { width: 100%; height: 100%; cursor: grab; touch-action: none; user-select: none; }
-svg.graph:active { cursor: grabbing; }
-.edge { stroke: var(--border-strong); stroke-width: 1.5; }
+svg.graph { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; user-select: none; }
+svg.graph.panning { cursor: grabbing; }
+
+/* Links: parent → subtask gray, blocker → blocked orange dashed with an arrow. */
+.edge { fill: none; stroke: var(--border-strong); stroke-width: 1.5; }
 .edge.dep { stroke: #f97316; stroke-dasharray: 5 4; stroke-width: 1.8; }
+.edge.child.hl { stroke: var(--subtle); stroke-width: 2.2; }
+.edge.dep.hl { stroke-width: 2.4; }
 #arrow path { fill: #f97316; }
-.node { cursor: pointer; }
-.node .hit { fill: transparent; }
-.node circle:not(.hit) { stroke: var(--background); stroke-width: 2; }
-.node text { font-size: 12px; font-weight: 500; text-anchor: middle; fill: var(--foreground); paint-order: stroke; stroke: var(--background); stroke-width: 3px; }
-.node.st-done { opacity: 0.4; }
-.node:hover circle:not(.hit) { stroke: var(--foreground); }
-circle.ring-waiting { stroke: var(--waiting-fg) !important; stroke-dasharray: 3 2; stroke-width: 2.5 !important; }
+/* XMind-style fold button on the right edge of a parent card, where its links start. */
+.fold { cursor: pointer; }
+.fold circle { fill: var(--background); stroke: var(--border-strong); stroke-width: 1.5; }
+.fold path { stroke: var(--muted-foreground); stroke-width: 1.6; stroke-linecap: round; }
+.fold text { font-size: 10px; font-weight: 600; fill: var(--muted-foreground); text-anchor: middle; dominant-baseline: central; }
+.fold:hover circle { stroke: var(--foreground); }
+.fold:hover path { stroke: var(--foreground); }
+.fold:hover text { fill: var(--foreground); }
+
+/* A task card, styled like the list's rows and the backlog's cards. */
+.gnode {
+  box-sizing: border-box; height: 100%; padding: 7px 10px; overflow: hidden;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-xs); cursor: pointer; font-size: 13px; color: var(--foreground);
+}
+/* Hover: only the card itself changes; drop-shadow keeps the priority stripe (a box-shadow) intact. */
+.gnode:hover { border-color: var(--subtle); filter: drop-shadow(0 3px 6px rgb(0 0 0 / 0.1)); }
+.gnode-top { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.gnode-top .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gnode-meta { display: flex; align-items: center; gap: 4px; margin-top: 5px; overflow: hidden; white-space: nowrap; }
+.gnode-meta .badge, .gnode-meta .chip { flex: none; font-size: 11px; padding: 0 6px; height: 18px; }
+.gnode.match { border-color: #f59e0b; box-shadow: 0 0 0 2px rgb(245 158 11 / 0.45); }
+
+/* Search: non-matching tasks fade while there is a query. */
+svg.searching [data-node]:not(:has(.match)) { opacity: 0.3; }
+
+.graph-hint {
+  position: absolute; left: 12px; bottom: 10px; padding: 4px 10px; font-size: 12px; color: var(--muted-foreground);
+  background: var(--glass); border: 1px solid var(--border); border-radius: 999px; pointer-events: none;
+}
 .legend { display: inline-flex; gap: 16px; align-items: center; color: var(--muted-foreground); font-size: 12px; }
 .legend > span { display: inline-flex; align-items: center; gap: 6px; }
-.cat-legend {
-  position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 12px;
-  padding: 8px 12px; font-size: 12px; color: var(--foreground-2);
-  background: var(--glass); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm);
-}
-.cat-legend span { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ---------- settings ---------- */
 
