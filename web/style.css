@@ -372,6 +372,11 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
 .sprint-info .muted { font-size: 13px; }
 .sprint-info .overdue { color: var(--destructive); }
 .days-left { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; vertical-align: -1px; }
+/* Critical / Highest / High tasks in the sprint, of the most it can have. */
+.prio-slots { display: inline-flex; gap: 10px; margin-left: 12px; vertical-align: -1px; font-size: 12px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.prio-slots > span { display: inline-flex; align-items: center; gap: 3px; }
+.prio-slots .full { color: var(--foreground-2); font-weight: 500; }
+.prio-slots .over { color: var(--destructive); }
 /* A sprint's goals: one item per line. */
 .sprint-goals { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; color: var(--muted-foreground); font-size: 13px; }
 .sprint-goals li { display: flex; align-items: center; gap: 6px; }
@@ -704,6 +709,10 @@ code {
 .picker-btn:hover:not(:disabled) { background: var(--background) var(--select-arrows) no-repeat right 10px center; }
 .picker-list li { display: flex; align-items: center; gap: 8px; }
 .picker-list li[aria-selected="true"] { font-weight: 500; }
+.picker-list .opt-hint { margin-left: auto; font-size: 12px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.picker-list li[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+.picker-list li[aria-disabled="true"]:hover { background: none; }
+.field-note { font-size: 12px; font-weight: 400; color: var(--destructive); }
 .combo-list li.combo-empty { color: var(--muted-foreground); cursor: default; background: none; text-align: center; padding: 10px; }
 
 /* ---------- dialog ---------- */

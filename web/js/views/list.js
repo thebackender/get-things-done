@@ -1,8 +1,8 @@
 // Task list (left side of the Tasks tab): task tree with search, a Sprint / All filter, sorting and grouping.
-import { store, taskById, childrenOf, descendants, sprintById, sprintPhase, activeSprint, projectById, projectList, projectLabel, projectColor, updateTask } from '../store.js';
+import { store, taskById, childrenOf, descendants, sprintById, sprintPhase, activeSprint, prioritySlots, projectById, projectList, projectLabel, projectColor, updateTask } from '../store.js';
 import { openTaskEditor, openSprintEditor } from '../editor.js';
 import { projectChip, metaBadges, doingBadge, progressBar, sprintGoals, openContextMenu, taskMenuItems } from '../components.js';
-import { esc, prioIcon, prioClass, statusName, empty, freshBox, today, daysBetween, trunc, toast, PRIORITIES } from '../util.js';
+import { esc, prioIcon, prioClass, prioName, statusName, empty, freshBox, today, daysBetween, trunc, toast, PRIORITIES } from '../util.js';
 import { icon } from '../icons.js';
 import { getPrefs, setPrefs } from '../prefs.js';
 
@@ -135,6 +135,13 @@ document.addEventListener('click', (e) => {
 const select = (key, options) =>
   `<select data-key="${key}">${Object.entries(options).map(([v, l]) => `<option value="${v}" ${state[key] === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
 
+/** How many Critical / Highest / High tasks the sprint holds, of the most it can have. */
+function prioSlots(sprint) {
+  const parts = [3, 2, 1].map((p) => ({ p, s: prioritySlots(sprint.id, p) })).filter((x) => x.s);
+  return parts.length ? `<span class="prio-slots">${parts.map(({ p, s }) => `<span class="${s.used >= s.limit ? 'full' : ''}${s.used > s.limit ? ' over' : ''}"
+    title="${prioName(p)}: ${s.used} of ${s.limit} per sprint">${prioIcon(p)}${s.used}/${s.limit}</span>`).join('')}</span>` : '';
+}
+
 function sprintLine(sprint) {
   const tasks = store.tasks.filter((t) => t.sprint_id === sprint.id);
   const done = tasks.filter((t) => t.status === 'done').length;
@@ -142,7 +149,7 @@ function sprintLine(sprint) {
   const timing = left == null ? '' : left >= 0 ? `${left} day${left === 1 ? '' : 's'} left` : `<span class="overdue">${-left} day(s) overdue</span>`;
   return `<div class="sprint-line">
     <div class="sprint-info">
-      <div><b>${esc(sprint.name)}</b> ${timing ? `<span class="muted days-left">${icon('clock', 13)}${timing}</span>` : ''}</div>
+      <div><b>${esc(sprint.name)}</b> ${timing ? `<span class="muted days-left">${icon('clock', 13)}${timing}</span>` : ''}${prioSlots(sprint)}</div>
       ${sprintGoals(sprint)}
     </div>
     <span class="sprint-progress" title="${done} of ${tasks.length} done">${progressBar(done, tasks.length)} ${done}/${tasks.length}</span>

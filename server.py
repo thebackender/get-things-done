@@ -46,7 +46,10 @@ LIMITS = {
     "sprint_name": 60,
     "sprint_goal": 150,
     "sprint_goals": 10,
+    # Tasks of each top priority per sprint, done ones included: "3" Critical, "2" Highest, "1" High. Medium and lower: no limit.
+    "sprint_priorities": {"3": 2, "2": 3, "1": 3},
 }
+PRIORITY_NAMES = {3: "Critical", 2: "Highest", 1: "High", 0: "Medium", -1: "Low", -2: "Lowest"}
 MAX_BODY_BYTES = 1024 * 1024  # one API request
 TRACKED_FIELDS = ("status", "sprint_id", "priority", "due")
 
@@ -552,6 +555,26 @@ def log_changes(data, before, task):
         log(data, task["id"], "progress", old_sum, new_sum)
 
 
+def check_sprint_priority(data, task, before=None):
+    """A sprint holds at most LIMITS["sprint_priorities"] Critical / Highest / High tasks.
+    Checked only when the task takes a new slot (new task, new priority or new sprint), so data that is
+    already over the limit keeps working. Past sprints don't count: their unfinished tasks are in the backlog."""
+    limit = LIMITS["sprint_priorities"].get(str(task["priority"]))
+    sprint_id = task["sprint_id"]
+    if limit is None or sprint_id is None:
+        return
+    if before and before["sprint_id"] == sprint_id and before["priority"] == task["priority"]:
+        return
+    sprint = next((s for s in live(data["sprints"]) if s["id"] == sprint_id), None)
+    if not sprint or (sprint["end"] and sprint["end"] < today()):
+        return
+    count = sum(1 for t in live(data["tasks"]) if t["sprint_id"] == sprint_id and t["priority"] == task["priority"])
+    if count > limit:
+        name = PRIORITY_NAMES[task["priority"]]
+        raise ApiError(f'"{sprint["name"]}" already has {limit} {name} tasks, the most a sprint can have. '
+                       f'Lower the priority of this task or of another {name} task in the sprint.')
+
+
 def create_task(data, payload):
     fields = clean_task(payload)
     if not fields.get("title"):
@@ -559,6 +582,7 @@ def create_task(data, payload):
     task = {"id": next_id(data["tasks"]), **copy.deepcopy(TASK_DEFAULTS), **fields, "created": today()}
     data["tasks"].append(task)
     check_task_refs(data, task)
+    check_sprint_priority(data, task)
     apply_blocking(data, task, payload)
     goal_reached = apply_goal(task)
     apply_done_at(task)
@@ -574,6 +598,7 @@ def update_task(data, task_id, payload):
     fields = clean_task(payload)
     task.update(fields)
     check_task_refs(data, task, fields)
+    check_sprint_priority(data, task, before)
     apply_blocking(data, task, payload)
     goal_reached = False
     if "progress" in fields or "target" in fields:

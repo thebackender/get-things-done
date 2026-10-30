@@ -109,6 +109,7 @@ function setup(box) {
 
 /**
  * items: [{value, label, icon}] (icon is HTML). The value lives in a hidden input with the given name.
+ * An option can be turned off later with aria-disabled="true" on its <li>, and get a note in its .opt-hint.
  * Put it in a <div class="field">, not a <label>: a label would pass clicks on the list back to the button.
  */
 export function pickerHTML(name, items, value, ariaLabel = name) {
@@ -117,7 +118,7 @@ export function pickerHTML(name, items, value, ariaLabel = name) {
     <input type="hidden" name="${name}" value="${esc(cur.value)}">
     <button type="button" class="picker-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="${esc(ariaLabel)}">${cur.icon}<span>${esc(cur.label)}</span></button>
     <ul class="combo-list picker-list" role="listbox" hidden>
-      ${items.map((i) => `<li role="option" data-value="${esc(i.value)}" aria-selected="${i === cur}">${i.icon}<span>${esc(i.label)}</span></li>`).join('')}
+      ${items.map((i) => `<li role="option" data-value="${esc(i.value)}" aria-selected="${i === cur}">${i.icon}<span>${esc(i.label)}</span><span class="opt-hint"></span></li>`).join('')}
     </ul>
   </div>`;
 }
@@ -149,11 +150,13 @@ function setupPicker(box) {
     btn.setAttribute('aria-expanded', 'false');
   }
   function choose(li) {
+    if (li.getAttribute('aria-disabled') === 'true') return; // stays open: pick another one
     close();
     if (li.dataset.value === hidden.value) return;
     hidden.value = li.dataset.value;
     items.forEach((x) => x.setAttribute('aria-selected', x === li));
     btn.innerHTML = li.innerHTML;
+    btn.querySelector('.opt-hint')?.remove();
     hidden.dispatchEvent(new Event('change', { bubbles: true }));
   }
 

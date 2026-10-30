@@ -1,6 +1,6 @@
 // Modal dialogs: task editor and sprint editor (one shared <dialog>).
 import {
-  store, taskById, childrenOf, descendants, projectList, projectLabel, isSelectable, createProject, sprintById, sprintOrder, sprintPhase,
+  store, taskById, childrenOf, descendants, projectList, projectLabel, isSelectable, createProject, sprintById, sprintOrder, sprintPhase, prioritySlots,
   createTask, updateTask, deleteTask, createSprint, updateSprint, deleteSprint, maxlength, maxNumber,
 } from './store.js';
 import {
@@ -114,7 +114,8 @@ export function openTaskEditor(task = null, preset = {}) {
     <input name="title" class="title-input" placeholder="What needs to be done?" value="${esc(t.title)}" autocomplete="off" autofocus ${maxlength('task_title')}>
     <div class="grid">
       <label>Status<select name="status">${STATUSES.map((s) => opt(s.value, s.name, t.status)).join('')}</select></label>
-      <div class="field">Priority${pickerHTML('priority', PRIORITIES.map((p) => ({ value: p.value, label: p.name, icon: prioIcon(p.value) })), t.priority, 'Priority')}</div>
+      <div class="field">Priority${pickerHTML('priority', PRIORITIES.map((p) => ({ value: p.value, label: p.name, icon: prioIcon(p.value) })), t.priority, 'Priority')}
+        <span class="field-note prio-note" hidden></span></div>
       <div class="field">Project
         <select name="project_id">
           <option value="">— none —</option>
@@ -169,6 +170,28 @@ export function openTaskEditor(task = null, preset = {}) {
   bindDateInputs(form);
   bindCombos(form);
   bindPickers(form);
+  // Per-sprint limits for Critical / Highest / High: a full priority can't be picked; the note explains a full one
+  // that is already chosen (e.g. after switching to another sprint). The task keeps a slot it already has.
+  const prioBox = form.querySelector('.picker');
+  const prioNote = form.querySelector('.prio-note');
+  const updatePriorityLimits = () => {
+    const sprintId = el.sprint_id.value ? Number(el.sprint_id.value) : null;
+    const chosen = Number(el.priority.value);
+    let full = null;
+    for (const li of prioBox.querySelectorAll('li')) {
+      const p = Number(li.dataset.value);
+      const slots = prioritySlots(sprintId, p, t.id);
+      const keeps = !isNew && t.sprint_id === sprintId && t.priority === p;
+      const isFull = !!slots && !keeps && slots.used >= slots.limit;
+      li.setAttribute('aria-disabled', isFull);
+      li.title = isFull ? `This sprint already has ${slots.limit} ${prioName(p)} tasks` : '';
+      li.querySelector('.opt-hint').textContent = slots ? `${slots.used + (keeps ? 1 : 0)}/${slots.limit}` : '';
+      if (isFull && p === chosen) full = { p, ...slots };
+    }
+    prioNote.hidden = !full;
+    if (full) prioNote.textContent = `${sprintById(sprintId).name} already has ${full.limit} ${prioName(full.p)} tasks. Pick a lower priority or another sprint.`;
+  };
+  updatePriorityLimits();
   const progressBox = form.querySelector('.progress-box');
 
   function renderProgress() {
@@ -337,6 +360,7 @@ export function openTaskEditor(task = null, preset = {}) {
   };
 
   form.onchange = (e) => {
+    if (e.target.name === 'sprint_id' || e.target.name === 'priority') updatePriorityLimits();
     if (e.target.name === 'status') form.querySelector('.waiting-row').hidden = e.target.value !== 'waiting';
     if (e.target === projectSelect) {
       if (projectSelect.value === NEW_PROJECT) {
