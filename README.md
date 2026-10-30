@@ -11,6 +11,16 @@ python3 server.py          # http://localhost:8000
 python3 server.py 9000     # on another port
 ```
 
+Backups go to `data/backups/`. To keep them somewhere else (another disk or a synced cloud folder keeps them safe if this disk fails), set the folder once in a `.env` file next to `server.py`:
+
+```bash
+cp .env.example .env
+# then in .env:
+GTD_BACKUP_DIR=~/Dropbox/gtd-backups
+```
+
+`.env` can also set `GTD_PORT`. It isn't committed to git. Command-line options (`python3 server.py 9000 --backup-dir PATH`) win over `.env`. The backup folder is created if it doesn't exist.
+
 The server listens on `127.0.0.1` only, so it isn't reachable from the network. The API also refuses requests from other sites open in your browser: it only accepts JSON, from this page's own address (`localhost` or `127.0.0.1`).
 
 ## Tabs
@@ -49,7 +59,7 @@ Editing a task in the UI drops its links to deleted items.
 
 The UI shows and accepts dates as `DD.MM.YYYY`; the file stores them as `YYYY-MM-DD`.
 
-Before the first write of each day, the server copies the file to `data/backups/planner-YYYY-MM-DD.json` and keeps the last 14 copies.
+Before the first write of each day, the server copies the file to `planner-YYYY-MM-DD.json` in the backup folder (`data/backups/` unless set with `--backup-dir`) and keeps the last 14 copies.
 To roll back, stop the server and copy a backup over `data/planner.json`.
 
 ### Task fields

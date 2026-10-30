@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""GTD Planner: local server.
+"""Get Things Done: local server.
 
 Serves the web UI from web/ and a REST API; data lives in data/planner.json.
 Python standard library only.
 
-Run:  python3 server.py [port]   (default 8000)
+Run:  python3 server.py [port] [--backup-dir PATH]   (default port 8000, backups in data/backups)
+Settings can also live in a .env file next to this one (see .env.example).
 """
+import argparse
 import copy
 import json
 import math
@@ -22,7 +24,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
 DATA_FILE = DATA_DIR / "planner.json"
-BACKUP_DIR = DATA_DIR / "backups"
+BACKUP_DIR = DATA_DIR / "backups"  # can be changed at start: --backup-dir, or GTD_BACKUP_DIR (in .env)
+ENV_FILE = ROOT / ".env"
 SETTINGS_FILE = DATA_DIR / "settings.json"
 WEB_DIR = ROOT / "web"
 
@@ -114,7 +117,7 @@ def load():
         with DATA_FILE.open(encoding="utf-8") as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
-        raise ApiError(f"{DATA_FILE.name} is corrupted: {e}. Backups are in data/backups/", 500)
+        raise ApiError(f"{DATA_FILE.name} is corrupted: {e}. Backups are in {BACKUP_DIR}", 500)
     migrate_categories(data)
     for key in ("tasks", "sprints", "projects", "history"):
         data.setdefault(key, [])
@@ -173,7 +176,7 @@ def migrate_categories(data):
 
 
 def backup_daily():
-    """Before the first write of the day, copy the current file to data/backups/."""
+    """Before the first write of the day, copy the current file to BACKUP_DIR (data/backups/ by default)."""
     if not DATA_FILE.exists():
         return
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
@@ -917,8 +920,43 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(404)
 
 
+def load_env_file(path=ENV_FILE):
+    """Read KEY=VALUE lines from .env into the environment (no packages needed).
+    Blank lines and # comments are skipped; quotes around a value are dropped.
+    A variable already set in the real environment wins over the file."""
+    if not path.exists():
+        return
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, sep, value = line.removeprefix("export ").partition("=")
+        key, value = key.strip(), value.strip()
+        if not sep or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+            print(f"Warning: {path.name} line {number} is not KEY=VALUE, skipped", file=sys.stderr)
+            continue
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
+
+
 def main():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
+    global BACKUP_DIR
+    load_env_file()
+    parser = argparse.ArgumentParser(description="Get Things Done: a local planner.")
+    parser.add_argument("port", nargs="?", type=int, default=int(os.environ.get("GTD_PORT") or 8000),
+                        help="port to listen on (default 8000; also GTD_PORT)")
+    parser.add_argument("--backup-dir", default=os.environ.get("GTD_BACKUP_DIR"),
+                        help="folder for the daily backups, e.g. on another disk or a synced folder "
+                             "(default: data/backups; also GTD_BACKUP_DIR, e.g. in .env)")
+    args = parser.parse_args()
+    port = args.port
+    if args.backup_dir:
+        BACKUP_DIR = Path(args.backup_dir).expanduser().resolve()
+    try:
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)  # fail now, not on the first change of the day
+    except OSError as e:
+        sys.exit(f"Cannot use {BACKUP_DIR} for backups: {e}")
     if not DATA_FILE.exists():
         save(empty_state())
     try:
@@ -926,7 +964,8 @@ def main():
     except ApiError as e:
         sys.exit(str(e))
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"Get Things Done: http://localhost:{port}   (Ctrl+C to stop)")
+    print(f"Get Things Done: http://localhost:{port}   (Ctrl+C to stop)", flush=True)
+    print(f"Backups: {BACKUP_DIR}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
