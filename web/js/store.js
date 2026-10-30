@@ -70,15 +70,15 @@ export function sprintOrder(a, b) {
 }
 
 /**
- * Critical / Highest / High tasks are limited per sprint (LIMITS["sprint_priorities"] in server.py).
- * {used, limit} for a priority in a sprint, not counting task exceptId; null when there is no limit
- * (lower priorities, the backlog, past sprints).
+ * Unfinished Critical / Highest / High tasks are limited per sprint (LIMITS["sprint_priorities"] in server.py);
+ * done tasks don't count. {used, limit} for a priority in a sprint, not counting task exceptId; null when there
+ * is no limit (lower priorities, the backlog, past sprints).
  */
 export function prioritySlots(sprintId, priority, exceptId = null) {
   const limit = store.limits.sprint_priorities?.[priority];
   const s = sprintId != null ? sprintById(sprintId) : null;
   if (limit == null || !s || sprintPhase(s) === 'past') return null;
-  const used = store.tasks.filter((t) => t.sprint_id === sprintId && t.priority === priority && t.id !== exceptId).length;
+  const used = store.tasks.filter((t) => t.sprint_id === sprintId && t.priority === priority && t.status !== 'done' && t.id !== exceptId).length;
   return { used, limit };
 }
 

@@ -177,19 +177,20 @@ export function openTaskEditor(task = null, preset = {}) {
   const updatePriorityLimits = () => {
     const sprintId = el.sprint_id.value ? Number(el.sprint_id.value) : null;
     const chosen = Number(el.priority.value);
+    const done = el.status.value === 'done'; // a done task takes no place
     let full = null;
     for (const li of prioBox.querySelectorAll('li')) {
       const p = Number(li.dataset.value);
-      const slots = prioritySlots(sprintId, p, t.id);
-      const keeps = !isNew && t.sprint_id === sprintId && t.priority === p;
+      const slots = done ? null : prioritySlots(sprintId, p, t.id);
+      const keeps = !isNew && t.sprint_id === sprintId && t.priority === p; // also lets a done task be reopened
       const isFull = !!slots && !keeps && slots.used >= slots.limit;
       li.setAttribute('aria-disabled', isFull);
-      li.title = isFull ? `This sprint already has ${slots.limit} ${prioName(p)} tasks` : '';
-      li.querySelector('.opt-hint').textContent = slots ? `${slots.used + (keeps ? 1 : 0)}/${slots.limit}` : '';
+      li.title = isFull ? `This sprint already has ${slots.limit} unfinished ${prioName(p)} tasks` : '';
+      li.querySelector('.opt-hint').textContent = slots ? `${slots.used + (keeps && t.status !== 'done' ? 1 : 0)}/${slots.limit}` : '';
       if (isFull && p === chosen) full = { p, ...slots };
     }
     prioNote.hidden = !full;
-    if (full) prioNote.textContent = `${sprintById(sprintId).name} already has ${full.limit} ${prioName(full.p)} tasks. Pick a lower priority or another sprint.`;
+    if (full) prioNote.textContent = `${sprintById(sprintId).name} already has ${full.limit} unfinished ${prioName(full.p)} tasks. Pick a lower priority or another sprint.`;
   };
   updatePriorityLimits();
   const progressBox = form.querySelector('.progress-box');
@@ -366,7 +367,7 @@ export function openTaskEditor(task = null, preset = {}) {
   };
 
   form.onchange = (e) => {
-    if (e.target.name === 'sprint_id' || e.target.name === 'priority') updatePriorityLimits();
+    if (e.target.name === 'sprint_id' || e.target.name === 'priority' || e.target.name === 'status') updatePriorityLimits();
     if (e.target.name === 'status') form.querySelector('.waiting-row').hidden = e.target.value !== 'waiting';
     if (e.target === projectSelect) {
       if (projectSelect.value === NEW_PROJECT) {

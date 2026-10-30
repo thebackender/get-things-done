@@ -126,10 +126,10 @@ The server checks these on every change; the UI stops typing at the same length 
 | Project / subproject name | 40 characters |
 | Sprint name | 60 characters |
 | Sprint goals | 10 per sprint, 150 characters each |
-| Critical / Highest / High tasks | 2 / 3 / 3 per sprint (done ones count too; Medium and lower, the backlog and past sprints have no limit) |
+| Critical / Highest / High tasks | 2 / 3 / 3 unfinished at once per sprint (a done task frees its place; Medium and lower, the backlog and past sprints have no limit) |
 | One API request | 1 MB |
 
-A full priority can't be picked in the task editor (it shows how many slots a sprint has left), and a task can't be moved into a sprint where its priority is full. Tasks that were over the limit before keep their priority.
+A full priority can't be picked in the task editor (it shows how many slots a sprint has left), and a task can't be moved into a sprint where its priority is full. Tasks that were over the limit before keep their priority, and a done task can always be reopened.
 
 ## Layout
 

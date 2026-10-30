@@ -50,7 +50,8 @@ LIMITS = {
     "sprint_name": 60,
     "sprint_goal": 150,
     "sprint_goals": 10,
-    # Tasks of each top priority per sprint, done ones included: "3" Critical, "2" Highest, "1" High. Medium and lower: no limit.
+    # Unfinished tasks of each top priority open at once in a sprint: "3" Critical, "2" Highest, "1" High.
+    # A done task frees its place. Medium and lower: no limit.
     "sprint_priorities": {"3": 2, "2": 3, "1": 3},
 }
 PRIORITY_NAMES = {3: "Critical", 2: "Highest", 1: "High", 0: "Medium", -1: "Low", -2: "Lowest"}
@@ -564,23 +565,25 @@ def log_changes(data, before, task):
 
 
 def check_sprint_priority(data, task, before=None):
-    """A sprint holds at most LIMITS["sprint_priorities"] Critical / Highest / High tasks.
-    Checked only when the task takes a new slot (new task, new priority or new sprint), so data that is
-    already over the limit keeps working. Past sprints don't count: their unfinished tasks are in the backlog."""
+    """A sprint holds at most LIMITS["sprint_priorities"] unfinished Critical / Highest / High tasks; done ones
+    don't count. Checked only when the task takes a new slot (new task, new priority or new sprint), so data that is
+    already over the limit keeps working, and a done task can be reopened. Past sprints don't count: their
+    unfinished tasks are in the backlog."""
     limit = LIMITS["sprint_priorities"].get(str(task["priority"]))
     sprint_id = task["sprint_id"]
-    if limit is None or sprint_id is None:
+    if limit is None or sprint_id is None or task["status"] == "done":
         return
     if before and before["sprint_id"] == sprint_id and before["priority"] == task["priority"]:
         return
     sprint = next((s for s in live(data["sprints"]) if s["id"] == sprint_id), None)
     if not sprint or (sprint["end"] and sprint["end"] < today()):
         return
-    count = sum(1 for t in live(data["tasks"]) if t["sprint_id"] == sprint_id and t["priority"] == task["priority"])
+    count = sum(1 for t in live(data["tasks"])
+                if t["sprint_id"] == sprint_id and t["priority"] == task["priority"] and t["status"] != "done")
     if count > limit:
         name = PRIORITY_NAMES[task["priority"]]
-        raise ApiError(f'"{sprint["name"]}" already has {limit} {name} tasks, the most a sprint can have. '
-                       f'Lower the priority of this task or of another {name} task in the sprint.')
+        raise ApiError(f'"{sprint["name"]}" already has {limit} unfinished {name} tasks, the most a sprint can have. '
+                       f'Finish one, lower the priority of this task or of another {name} task in the sprint.')
 
 
 def create_task(data, payload):
