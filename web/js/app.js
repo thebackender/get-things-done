@@ -61,6 +61,13 @@ document.addEventListener('keydown', (e) => {
   } else if (!e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'KeyN') {
     e.preventDefault();
     newTask();
+  } else if (!e.ctrlKey && !e.metaKey && !e.altKey && /^(Digit|Numpad)[1-9]$/.test(e.code)) {
+    // 1–4: the tabs in header order.
+    const tab = document.querySelectorAll('#tabs a')[Number(e.code.at(-1)) - 1];
+    if (tab) {
+      e.preventDefault();
+      location.hash = tab.getAttribute('href');
+    }
   }
 });
 
