@@ -7,7 +7,7 @@ import { projectChip, metaBadges } from '../components.js';
 import { esc, prioIcon, prioClass, prioName, empty, freshBox } from '../util.js';
 import { icon } from '../icons.js';
 import { getPrefs, setPrefs } from '../prefs.js';
-import { listFilter, listView, setListView, isCollapsed, toggleCollapsed } from './list.js';
+import { listFilter, listView, setListView, isCollapsed, toggleCollapsed, filterMenus, handleFilterEvent } from './list.js';
 
 const W = 250; // card size
 const H = 58;
@@ -150,7 +150,8 @@ function nodeHTML(t, p) {
 
 // ---------- tab ----------
 
-export function render(view) {
+/** openMenu: a filter menu to keep open across the re-render. */
+export function render(view, openMenu = null) {
   const root = freshBox(view);
   const { scope, hideDone } = listView();
   const all = store.tasks.filter(listFilter);
@@ -180,6 +181,7 @@ export function render(view) {
       ${activeSprint() ? `<div class="segmented" role="radiogroup" aria-label="Show">
         ${[['sprint', 'Sprint'], ['all', 'All']].map(([v, l]) => `<button type="button" role="radio" aria-checked="${scope === v}" class="${scope === v ? 'on' : ''}" data-scope="${v}">${l}</button>`).join('')}
       </div>` : ''}
+      ${filterMenus(openMenu)}
       <details class="view-menu">
         <summary title="Which tasks to show">${icon('sliders', 15)} View</summary>
         <div class="menu">
@@ -331,7 +333,14 @@ export function render(view) {
     const hit = nodes.find(matches);
     if (hit) centerOn(hit.id);
   });
+  const refilter = (e) => {
+    const key = handleFilterEvent(e);
+    if (!key) return false;
+    render(view, e.type === 'change' ? key : null);
+    return true;
+  };
   toolbar.addEventListener('click', (e) => {
+    if (refilter(e)) return;
     const scopeBtn = e.target.closest('[data-scope]');
     if (scopeBtn && scopeBtn.dataset.scope !== scope) {
       setListView({ scope: scopeBtn.dataset.scope });
@@ -340,6 +349,7 @@ export function render(view) {
     if (e.target.closest('[data-act="fit"]')) fit();
   });
   toolbar.addEventListener('change', (e) => {
+    if (refilter(e)) return;
     const key = e.target.dataset.opt;
     if (key === 'hideDone') setListView({ hideDone: e.target.checked });
     else if (key === 'onlyLinked' || key === 'hideSubtasks') {

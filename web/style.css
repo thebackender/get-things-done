@@ -473,6 +473,15 @@ button.more:hover:not(:disabled) { background: var(--accent); color: var(--foreg
 }
 .view-menu .menu label:not(.check) { justify-content: space-between; }
 .view-menu .menu select { width: 140px; }
+/* Project / Priority filters: checkbox lists; an active filter is highlighted. */
+.filter-menu summary { gap: 5px; }
+.filter-menu summary .i { color: var(--muted-foreground); }
+.filter-menu summary.active { border-color: var(--foreground-2); background: var(--accent); }
+.filter-menu summary .prio-icon { margin-left: -2px; }
+.filter-menu .menu { left: 0; right: auto; gap: 8px; max-height: 360px; overflow: auto; }
+.filter-menu .menu label.check { font-size: 13px; gap: 8px; }
+.filter-menu .sub-indent { display: inline-block; width: 10px; }
+.filter-menu .clear { height: 30px; justify-content: flex-start; padding: 0 6px; font-size: 13px; color: var(--muted-foreground); border-top: 1px solid var(--border); border-radius: 0; margin-top: 2px; }
 
 /* Year view: twelve mini months, Apple Calendar style. */
 .year-grid {

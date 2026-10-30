@@ -2,14 +2,20 @@
 import { store, taskById, childrenOf, sprintById, sprintPhase, activeSprint, projectById, projectList, projectLabel, projectColor, updateTask } from '../store.js';
 import { openTaskEditor, openSprintEditor } from '../editor.js';
 import { projectChip, metaBadges, progressBar, sprintGoals } from '../components.js';
-import { esc, prioIcon, prioClass, statusName, empty, freshBox, fmtDate, today, daysBetween } from '../util.js';
+import { esc, prioIcon, prioClass, statusName, empty, freshBox, fmtDate, today, daysBetween, trunc, PRIORITIES } from '../util.js';
 import { icon } from '../icons.js';
 import { getPrefs, setPrefs } from '../prefs.js';
 
 // View options are saved in data/settings.json; the search box is not.
-const state = { ...getPrefs('list', { scope: 'sprint', sort: 'priority', group: 'project', hideDone: false, collapsed: [] }), q: '' };
+// projects: project ids (and 'none' for tasks without one); priorities: priority values. Empty = no filter.
+const state = {
+  ...getPrefs('list', { scope: 'sprint', sort: 'priority', group: 'project', hideDone: false, projects: [], priorities: [], collapsed: [] }),
+  q: '',
+};
 const persist = () => setPrefs('list', {
   scope: state.scope, sort: state.sort, group: state.group, hideDone: state.hideDone,
+  projects: state.projects.filter((id) => id === 'none' || projectById(id)), // forget deleted projects
+  priorities: state.priorities,
   collapsed: state.collapsed.filter((id) => taskById(id)), // forget deleted tasks
 });
 
@@ -19,7 +25,7 @@ const GROUPS = { project: 'Project', status: 'Status', sprint: 'Sprint', none: '
 if (!GROUPS[state.group]) state.group = 'project'; // saved views from before projects existed
 if (!SORTS[state.sort]) state.sort = 'priority';
 if (!SCOPES[state.scope]) state.scope = 'sprint';
-if (!Array.isArray(state.collapsed)) state.collapsed = [];
+for (const key of ['collapsed', 'projects', 'priorities']) if (!Array.isArray(state[key])) state[key] = [];
 const STATUS_ORDER = { doing: 0, todo: 1, waiting: 2, done: 3 };
 
 // Done tasks stay where the sort puts them (they are shown struck through), not moved to the bottom.
@@ -32,28 +38,83 @@ const COMPARE = {
 };
 const cmp = (a, b) => COMPARE[state.sort](a, b);
 
+// ---------- filters ----------
+// Sprint / All, Project and Priority are shared by the list, the calendar and the Graph tab.
+// "Hide done" is shared by the list and the graph (the calendar always shows done tasks, struck through).
+
 /** "Sprint" shows only the active sprint's tasks; without an active sprint it shows everything. */
 const scopeSprint = () => (state.scope === 'sprint' ? activeSprint() : null);
-/** The Sprint / All filter, shared with the calendar. */
-/** What the list shows: the scope, minus done tasks when "Hide done" is on. The calendar uses scopeFilter only. */
-const shown = (t) => scopeFilter(t) && !(state.hideDone && t.status === 'done');
 
-// The Graph tab shows the same tasks as the list and shares these two options with it.
+/** A top-level project also matches its subprojects; 'none' matches tasks without a (live) project. */
+function projectMatch(t) {
+  if (!state.projects.length) return true;
+  const p = projectById(t.project_id);
+  if (!p) return state.projects.includes('none');
+  return state.projects.includes(p.id) || (p.parent_id != null && state.projects.includes(p.parent_id));
+}
+const priorityMatch = (t) => !state.priorities.length || state.priorities.includes(t.priority);
+
+/** Sprint / All + Project + Priority: what the calendar shows. */
+export function scopeFilter(t) {
+  const sprint = scopeSprint();
+  return (!sprint || t.sprint_id === sprint.id) && projectMatch(t) && priorityMatch(t);
+}
+/** What the list (and the graph) shows: scopeFilter minus done tasks when "Hide done" is on. */
+const shown = (t) => scopeFilter(t) && !(state.hideDone && t.status === 'done');
 export const listFilter = (t) => shown(t);
+
 export const listView = () => ({ scope: state.scope, hideDone: state.hideDone });
+export function setListView(patch) {
+  Object.assign(state, patch);
+  persist();
+}
 /** Collapsed tasks (their subtasks are hidden) are shared with the Graph tab too. */
 export const isCollapsed = (id) => state.collapsed.includes(id);
 export function toggleCollapsed(id) {
   state.collapsed = isCollapsed(id) ? state.collapsed.filter((x) => x !== id) : [...state.collapsed, id];
   persist();
 }
-export function setListView(patch) {
-  Object.assign(state, patch);
-  persist();
+
+function projectSummary() {
+  const sel = state.projects;
+  if (!sel.length) return 'Project';
+  if (sel.length > 1) return `Projects: ${sel.length}`;
+  if (sel[0] === 'none') return 'No project';
+  return `Project: ${esc(trunc(projectById(sel[0])?.name ?? '?', 18))}`;
 }
-export function scopeFilter(t) {
-  const sprint = scopeSprint();
-  return !sprint || t.sprint_id === sprint.id;
+function prioritySummary() {
+  if (!state.priorities.length) return 'Priority';
+  return `Priority ${PRIORITIES.filter((p) => state.priorities.includes(p.value)).map((p) => prioIcon(p.value)).join('')}`;
+}
+
+/** The Project and Priority dropdowns (checkbox lists). Used in the list's and the graph's toolbars. */
+export function filterMenus(openKey = null) {
+  const check = (key, value, label) => `<label class="check"><input type="checkbox" data-filter-val="${value}" ${state[key].includes(value) ? 'checked' : ''}> ${label}</label>`;
+  const menu = (key, summary, body) => `<details class="view-menu filter-menu" data-filter="${key}"${openKey === key ? ' open' : ''}>
+    <summary class="${state[key].length ? 'active' : ''}">${summary}${icon('chevronDown', 14)}</summary>
+    <div class="menu">${body}${state[key].length ? `<button type="button" class="ghost clear" data-clear="${key}">Clear</button>` : ''}</div>
+  </details>`;
+  const projects = projectList().map((p) => check('projects', p.id,
+    `${p.parent_id == null ? `<i class="dot" style="--c:${projectColor(p.id)}"></i>` : `<span class="sub-indent"></span>`}${esc(p.name)}`)).join('');
+  return menu('projects', projectSummary(), projects + check('projects', 'none', '<span class="muted">No project</span>')) +
+    menu('priorities', prioritySummary(), PRIORITIES.map((p) => check('priorities', p.value, `${prioIcon(p.value)} ${p.name}`)).join(''));
+}
+
+/** Handle a change or click inside the filter menus. Returns the filter key that changed, or null. */
+export function handleFilterEvent(e) {
+  const clear = e.type === 'click' && e.target.closest('[data-clear]');
+  if (clear) {
+    state[clear.dataset.clear] = [];
+    persist();
+    return clear.dataset.clear;
+  }
+  if (e.type !== 'change' || !e.target.matches('[data-filter-val]')) return null;
+  const menu = e.target.closest('[data-filter]');
+  const key = menu.dataset.filter;
+  state[key] = [...menu.querySelectorAll('[data-filter-val]:checked')].map((el) =>
+    (el.dataset.filterVal === 'none' ? 'none' : Number(el.dataset.filterVal)));
+  persist();
+  return key;
 }
 
 // Close the View menu on a click outside it.
@@ -79,8 +140,11 @@ function sprintLine(sprint) {
   </div>`;
 }
 
-/** Render into pane. onScopeChange runs after the Sprint / All filter changes (the calendar follows it). */
-export function render(pane, opts = {}) {
+/**
+ * Render into pane. onScopeChange runs after Sprint / All, Project or Priority changes (the calendar follows them).
+ * openMenu: a filter menu to keep open across the re-render, so several values can be ticked in a row.
+ */
+export function render(pane, opts = {}, openMenu = null) {
   const root = freshBox(pane);
   const active = activeSprint();
   const sprint = scopeSprint();
@@ -90,6 +154,7 @@ export function render(pane, opts = {}) {
       ${active ? `<div class="segmented" role="radiogroup" aria-label="Show">
         ${Object.entries(SCOPES).map(([v, l]) => `<button type="button" role="radio" aria-checked="${state.scope === v}" class="${state.scope === v ? 'on' : ''}" data-scope="${v}">${l}</button>`).join('')}
       </div>` : ''}
+      ${filterMenus(openMenu)}
       <details class="view-menu">
         <summary title="Sorting, grouping, done tasks">${icon('sliders', 15)} View</summary>
         <div class="menu">
@@ -107,7 +172,16 @@ export function render(pane, opts = {}) {
     state.q = e.target.value;
     renderBody(root);
   });
+  const refilter = (e) => {
+    const key = handleFilterEvent(e);
+    if (!key) return false;
+    render(pane, opts, e.type === 'change' ? key : null);
+    opts.onScopeChange?.();
+    return true;
+  };
+  root.querySelector('.toolbar').addEventListener('change', refilter);
   root.querySelector('.toolbar').addEventListener('click', (e) => {
+    if (refilter(e)) return;
     const scope = e.target.closest('[data-scope]')?.dataset.scope;
     if (!scope || scope === state.scope) return;
     state.scope = scope;
@@ -174,8 +248,9 @@ function renderBody(root) {
     <section class="group">
       ${state.group !== 'none' ? `<h3>${color ? `<i class="dot" style="--c:${color}"></i>` : ''}${esc(name)} <span class="count">${items.length}</span></h3>` : ''}
       ${items.map((t) => tree(t, 0)).join('')}
-    </section>`).join('') || empty(scopeSprint()
-    ? 'No tasks in this sprint. Add tasks to it in the <a href="#backlog">Backlog</a> tab, or switch to All.'
+    </section>`).join('') || empty(state.projects.length || state.priorities.length
+    ? 'No tasks match the Project / Priority filters.'
+    : scopeSprint() ? 'No tasks in this sprint. Add tasks to it in the <a href="#backlog">Backlog</a> tab, or switch to All.'
     : state.hideDone ? 'Nothing left to do. Turn off "Hide done" under View to see finished tasks.' : 'No tasks.');
 }
 
