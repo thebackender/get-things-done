@@ -272,7 +272,10 @@ export function openTaskEditor(task = null, preset = {}) {
     save();
   };
 
-  /** Validate and save. Returns true when the task was sent to the server. */
+  /**
+   * Validate and save. Returns true when the server accepted it. The editor stays open until then,
+   * so nothing typed is lost when the server says no (a limit, a full priority, …).
+   */
   async function save() {
     const title = el.title.value.trim();
     if (!title) {
@@ -307,9 +310,12 @@ export function openTaskEditor(task = null, preset = {}) {
       unit: goal ? el.unit.value.trim() : '',
       progress,
     };
-    dlg.close();
-    if (isNew) await createTask(data);
-    else await updateTask(t.id, data);
+    const saveBtn = form.querySelector('button[type=submit]');
+    saveBtn.disabled = true; // no second request while the first one is on its way
+    const res = isNew ? await createTask(data) : await updateTask(t.id, data);
+    saveBtn.disabled = false;
+    if (!res) return false; // the error is already shown; the form keeps what was typed
+    if (dlg.contains(form)) dlg.close();
     return true;
   }
 
@@ -438,9 +444,12 @@ export function openSprintEditor(sprint = null) {
     if (!data.name) return el.name.focus();
     if (!data.start || !data.end) return toast('A sprint needs a start and an end date', 'error');
     if (data.end < data.start) return toast('Sprint end is before its start', 'error');
-    dlg.close();
-    if (isNew) await createSprint(data);
-    else await updateSprint(s.id, data);
+    // Stays open until the server accepts it (e.g. dates that overlap another sprint are refused).
+    const saveBtn = form.querySelector('button[type=submit]');
+    saveBtn.disabled = true;
+    const res = isNew ? await createSprint(data) : await updateSprint(s.id, data);
+    saveBtn.disabled = false;
+    if (res && dlg.contains(form)) dlg.close();
   };
   // Goals: one input per goal; there is always an empty one at the end to type the next goal into.
   const goalsBox = form.querySelector('.goals-edit');

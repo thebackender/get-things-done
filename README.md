@@ -11,7 +11,7 @@ python3 server.py          # http://localhost:8000
 python3 server.py 9000     # on another port
 ```
 
-The server listens on `127.0.0.1` only, so it isn't reachable from the network.
+The server listens on `127.0.0.1` only, so it isn't reachable from the network. The API also refuses requests from other sites open in your browser: it only accepts JSON, from this page's own address (`localhost` or `127.0.0.1`).
 
 ## Tabs
 

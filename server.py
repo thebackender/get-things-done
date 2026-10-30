@@ -8,6 +8,7 @@ Run:  python3 server.py [port]   (default 8000)
 """
 import copy
 import json
+import math
 import os
 import re
 import shutil
@@ -51,6 +52,7 @@ LIMITS = {
 }
 PRIORITY_NAMES = {3: "Critical", 2: "Highest", 1: "High", 0: "Medium", -1: "Low", -2: "Lowest"}
 MAX_BODY_BYTES = 1024 * 1024  # one API request
+LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")  # names the API answers to (see Handler.check_caller)
 TRACKED_FIELDS = ("status", "sprint_id", "priority", "due")
 
 TASK_DEFAULTS = {
@@ -300,6 +302,9 @@ def as_number(value, field):
     try:
         number = float(str(value).replace(",", "."))
     except (TypeError, ValueError):
+        raise ApiError(f"{field}: expected a number")
+    # NaN and infinity can't be written as JSON the browser can read: one would break the whole UI.
+    if not math.isfinite(number):
         raise ApiError(f"{field}: expected a number")
     return int(number) if number.is_integer() else round(number, 4)
 
@@ -600,8 +605,9 @@ def update_task(data, task_id, payload):
     check_task_refs(data, task, fields)
     check_sprint_priority(data, task, before)
     apply_blocking(data, task, payload)
+    # Mark done when this change reaches the goal; a goal already reached can still be reopened by hand.
     goal_reached = False
-    if "progress" in fields or "target" in fields:
+    if task["target"] != before["target"] or goal_sum(task) != goal_sum(before):
         goal_reached = apply_goal(task)
     apply_done_at(task)
     log_changes(data, before, task)
@@ -612,6 +618,8 @@ def batch_update(data, payload):
     items = payload.get("items")
     if not isinstance(items, list):
         raise ApiError("Expected {items: [...]}")
+    if not all(isinstance(item, dict) for item in items):
+        raise ApiError("Each item must be an object {id, ...}")
     results = [update_task(data, as_int(item.get("id"), "id"), item) for item in items]
     return {"items": [r["item"] for r in results], "goal_reached": any(r["goal_reached"] for r in results)}
 
@@ -834,7 +842,13 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def read_body(self):
-        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length < 0:
+            self.close_connection = True
+            raise ApiError("Invalid Content-Length")
         if not length:
             return {}
         if length > MAX_BODY_BYTES:
@@ -848,11 +862,29 @@ class Handler(SimpleHTTPRequestHandler):
             raise ApiError("Expected a JSON object")
         return body
 
+    def check_caller(self, method):
+        """Only this app may use the API. Another site open in the browser could otherwise send requests here:
+        a form-like POST (text/plain) needs no permission from the server, and a renamed host (DNS rebinding)
+        could even read the data. So the Host must be this machine, a given Origin must be this server,
+        and changes must come as JSON (a cross-site JSON request is blocked by the browser)."""
+        host = (self.headers.get("Host") or "").lower()
+        if host.rsplit(":", 1)[0].strip("[]") not in LOCAL_HOSTS:
+            raise ApiError("Forbidden host", 403)
+        origin = self.headers.get("Origin")
+        if origin and origin.lower() not in (f"http://{host}",):
+            raise ApiError("Requests from other sites are not allowed", 403)
+        if method in ("POST", "PUT"):
+            ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+            if ctype != "application/json":
+                self.close_connection = True
+                raise ApiError("Send JSON (Content-Type: application/json)", 415)
+
     def handle_api(self, method):
         path = self.path.split("?", 1)[0].rstrip("/")
         if not path.startswith("/api/"):
             return False
         try:
+            self.check_caller(method)
             for route_method, pattern, handler in ROUTES:
                 match = re.fullmatch(pattern, path)
                 if match and route_method == method:
@@ -894,7 +926,7 @@ def main():
     except ApiError as e:
         sys.exit(str(e))
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"GTD Planner: http://localhost:{port}   (Ctrl+C to stop)")
+    print(f"Get Things Done: http://localhost:{port}   (Ctrl+C to stop)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
