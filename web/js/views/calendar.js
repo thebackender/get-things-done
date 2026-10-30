@@ -45,7 +45,6 @@ function weekWindow(sprint) {
 }
 const persist = () => setPrefs('calendar', { mode });
 
-const short = (m) => MONTHS[m].slice(0, 3);
 const isWeekend = (d) => d.getDay() === 0 || d.getDay() === 6;
 const inSprint = (sprint, iso) => !!(sprint?.start && sprint?.end && iso >= sprint.start && iso <= sprint.end);
 
@@ -160,7 +159,7 @@ function monthView({ first, weeks }, byDate, sprint, now) {
     const cls = [d.getMonth() % 2 && 'alt', iso < now && 'past', iso === now && 'today', inSprint(sprint, iso) && 'in-sprint', isWeekend(d) && 'weekend']
       .filter(Boolean).join(' ');
     // The month name goes on the first cell and on each 1st.
-    const mon = i === 0 || d.getDate() === 1 ? `<span class="mon">${short(d.getMonth())}</span>` : '';
+    const mon = i === 0 || d.getDate() === 1 ? `<span class="mon">${MONTHS[d.getMonth()]}</span>` : '';
     const items = byDate.get(iso) || [];
     const shown = items.length > MAX_CHIPS ? items.slice(0, MAX_CHIPS - 1) : items;
     const more = items.length - shown.length;
@@ -171,9 +170,46 @@ function monthView({ first, weeks }, byDate, sprint, now) {
   return `<div class="calendar" style="--weeks:${weeks}">${WEEKDAYS.map((w) => `<div class="dow">${w}</div>`).join('')}${cells}</div>`;
 }
 
+/** Hide the chips that don't fit in their cell (a long month name, a small window) behind "+N more". */
+function fitChips(cal) {
+  for (const day of cal.querySelectorAll('.day')) {
+    // The content may use the cell's bottom padding (4px).
+    const overflows = () => day.scrollHeight > day.clientHeight + 5;
+    if (!overflows()) continue;
+    const chips = [...day.querySelectorAll('.cal-task')];
+    let more = day.querySelector('.more');
+    let hidden = Number(more?.textContent.match(/\d+/)?.[0] ?? 0);
+    while (overflows() && chips.length) {
+      chips.pop().remove();
+      hidden++;
+      if (!more) {
+        more = document.createElement('button');
+        more.type = 'button';
+        more.className = 'more';
+        day.append(more);
+      }
+      more.textContent = `+${hidden} more`;
+    }
+  }
+}
+
+// The cells follow the window size: when the calendar changes width, it is redrawn to fit its chips again.
+let resizeObs = null;
+let resizeTimer;
+function refitOnResize(cal, view) {
+  const width = cal.offsetWidth;
+  resizeObs = new ResizeObserver(() => {
+    if (!cal.isConnected || cal.offsetWidth === width) return;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => cal.isConnected && render(view), 100);
+  });
+  resizeObs.observe(cal);
+}
+
 // ---------- tab ----------
 
 export function render(view) {
+  resizeObs?.disconnect();
   const root = freshBox(view);
   const sprint = activeSprint();
   const now = today();
@@ -185,15 +221,15 @@ export function render(view) {
   let heading;
   if (mode === 'year') {
     const last = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + YEAR_MONTHS - 1, 1);
-    heading = `${short(firstMonth.getMonth())} ${firstMonth.getFullYear()} – ${short(last.getMonth())} ${last.getFullYear()}`;
+    heading = `${MONTHS[firstMonth.getMonth()]} ${firstMonth.getFullYear()} – ${MONTHS[last.getMonth()]} ${last.getFullYear()}`;
   } else {
     const last = addDaysTo(win.first, win.weeks * 7 - 1);
     const sameYear = last.getFullYear() === win.first.getFullYear();
-    heading = `${win.first.getDate()} ${short(win.first.getMonth())}${sameYear ? '' : ` ${win.first.getFullYear()}`} – ${last.getDate()} ${short(last.getMonth())} ${last.getFullYear()}`;
+    heading = `${win.first.getDate()} ${MONTHS[win.first.getMonth()]}${sameYear ? '' : ` ${win.first.getFullYear()}`} – ${last.getDate()} ${MONTHS[last.getMonth()]} ${last.getFullYear()}`;
   }
   const home = sprint?.start
-    ? { label: 'Sprint', title: `Back to the current sprint: ${sprint.name}` }
-    : { label: 'Today', title: 'Back to today' };
+    ? { title: `Back to the current sprint: ${sprint.name}` }
+    : { title: 'Back to today' };
 
   root.innerHTML = `<div class="cal-wrap ${mode}" style="--weeks:${win.weeks}">
     <div class="toolbar cal-toolbar">
@@ -204,12 +240,11 @@ export function render(view) {
       <span class="spacer"></span>
       <span class="nav-group">
         <button class="icon" data-nav="-1" title="Previous ${unit}">${icon('chevronLeft')}</button>
-        <button data-nav="0" title="${esc(home.title)}">${home.label}</button>
+        <button class="icon" data-nav="0" title="${esc(home.title)}" aria-label="${esc(home.title)}">${icon('locate')}</button>
         <button class="icon" data-nav="1" title="Next ${unit}">${icon('chevronRight')}</button>
       </span>
     </div>
     ${mode === 'year' ? yearView(firstMonth, byDate, sprint, now) : monthView(win, byDate, sprint, now)}
-    ${sprint ? `<div class="cal-foot"><span class="legend-sprint"><i></i> ${esc(sprint.name)}</span></div>` : ''}
   </div>`;
 
   root.querySelector('.toolbar').addEventListener('click', (e) => {
@@ -256,6 +291,9 @@ export function render(view) {
     return;
   }
 
+  const cal = root.querySelector('.calendar');
+  fitChips(cal);
+  refitOnResize(cal, view);
   cardClicks(root);
   root.querySelector('.calendar').addEventListener('click', (e) => {
     if (e.target.closest('.cal-task')) return;

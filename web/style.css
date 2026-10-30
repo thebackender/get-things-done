@@ -156,6 +156,8 @@ button.primary { background: var(--primary); border-color: var(--primary); color
 button.primary:hover:not(:disabled) { background: var(--primary-hover); }
 button.danger { color: var(--destructive); }
 button.danger:hover:not(:disabled) { background: var(--destructive-bg); }
+/* An icon-only button, as tall as the others. */
+button.square { width: 36px; padding: 0; }
 button.ghost { border-color: transparent; background: transparent; box-shadow: none; }
 button.ghost:hover:not(:disabled) { background: var(--accent); }
 button.icon {
@@ -366,6 +368,7 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
 .sprint-info { flex: 1; min-width: 0; }
 .sprint-info .muted { font-size: 13px; }
 .sprint-info .overdue { color: var(--destructive); }
+.days-left { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; vertical-align: -1px; }
 /* A sprint's goals: one item per line. */
 .sprint-goals { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; color: var(--muted-foreground); font-size: 13px; }
 .sprint-goals li { display: flex; align-items: center; gap: 6px; }
@@ -411,15 +414,16 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
 .day {
   aspect-ratio: 1; min-width: 0; padding: 4px 5px;
   background: var(--card); cursor: pointer; overflow: hidden;
+  container-type: inline-size; /* the month name scales with the cell */
 }
 .day.alt { background: var(--month-alt); }
 .day:hover { outline: 1px solid var(--border-strong); outline-offset: -1px; }
 .day.in-sprint { box-shadow: inset 0 2px 0 var(--sprint); }
-.day-num { display: flex; align-items: center; gap: 4px; height: 20px; margin-bottom: 2px; font-size: 12px; font-weight: 500; color: var(--foreground-2); }
-.day-num .n { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; border-radius: 999px; }
-.day-num .mon { font-weight: 700; color: var(--cal-accent); }
+.day-num { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; min-height: 20px; margin-bottom: 2px; font-size: 12px; font-weight: 500; color: var(--foreground-2); }
+.day-num .n { display: inline-flex; align-items: center; justify-content: center; flex: none; height: 20px; border-radius: 999px; }
+.day-num .mon { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 14px; font-size: clamp(9px, 18cqi - 2px, 12px); font-weight: 700; color: var(--cal-accent); }
 .day.weekend .day-num .n, .day.past .day-num .n { color: var(--subtle); }
-.day.today .day-num .n { padding: 0 5px; background: var(--cal-accent); color: #fff; font-weight: 700; }
+.day.today .day-num .n { min-width: 20px; padding: 0 5px; background: var(--cal-accent); color: #fff; font-weight: 700; }
 .cal-task {
   font-size: 12px; line-height: 18px;
   padding: 0 5px; margin-bottom: 2px;
@@ -429,6 +433,7 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
   cursor: grab;
 }
 button.more {
+  display: flex; width: fit-content; /* a block, so no line box adds height under it */
   height: 18px; padding: 0 5px; border: 0; background: none; box-shadow: none;
   font-size: 11px; font-weight: 500; color: var(--muted-foreground);
 }
@@ -436,13 +441,8 @@ button.more:hover:not(:disabled) { background: var(--accent); color: var(--foreg
 .cal-task.st-done { opacity: 0.55; text-decoration: line-through; }
 .cal-task.overdue { background: var(--destructive-bg); color: var(--destructive); }
 .overdue-icon { margin-right: 3px; vertical-align: -2px; }
-.legend-sprint { display: inline-flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 13px; }
-.legend-sprint i { width: 18px; height: 2px; background: var(--sprint); display: inline-block; }
 .cal-heading { margin: 0 !important; font-size: 16px; font-weight: 600; white-space: nowrap; }
 .nav-group { display: inline-flex; align-items: center; gap: 4px; }
-/* The year view marks sprint days with a gray band, not a blue line. */
-.cal-wrap.year .legend-sprint i { width: 16px; height: 10px; border-radius: 2px; background: var(--muted); }
-.cal-foot { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 13px; }
 
 /* Tasks tab: list on the left, calendar on the right. The calendar width follows the window height so a
    5-week month of square cells fits on screen; it sticks while the list scrolls. */
@@ -480,6 +480,8 @@ button.more:hover:not(:disabled) { background: var(--accent); color: var(--foreg
   border: 1px solid var(--input); border-radius: var(--radius-sm); background: var(--background);
   font-size: 14px; font-weight: 500; cursor: pointer; list-style: none; box-shadow: var(--shadow-xs);
 }
+/* Icon only: as wide as it is tall. */
+.view-menu:not(.filter-menu) > summary { width: 36px; padding: 0; justify-content: center; }
 .view-menu summary::-webkit-details-marker { display: none; }
 .view-menu summary:hover, .view-menu[open] summary { background: var(--accent); }
 .view-menu .menu {

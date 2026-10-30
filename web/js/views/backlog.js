@@ -69,19 +69,18 @@ export function render(view) {
   root.innerHTML = `
     <div class="backlog-layout">
       <section class="pane drop" data-sprint="">
-        <div class="pane-head"><h2>Backlog <span class="count">${backlog.length}</span></h2><button class="new-task">${icon('plus', 14)} Task</button></div>
+        <div class="pane-head"><h2>Backlog <span class="count">${backlog.length}</span></h2></div>
         <p class="hint">Drag tasks into a sprint on the right. Unfinished subtasks move along with their parent.</p>
         ${nested(backlog, { leftover: true }) || empty('Backlog is empty')}
       </section>
       <section class="pane">
-        <div class="pane-head"><h2>Sprints</h2><button class="primary new-sprint">${icon('plus', 14)} Sprint</button></div>
+        <div class="pane-head"><h2>Sprints</h2><button class="primary new-sprint" title="New sprint">Add</button></div>
         ${open.map(sprintBox).join('') || empty('No current or upcoming sprints. Create one and drag tasks into it.')}
         ${past.length ? `<details class="closed-sprints"${pastOpen ? ' open' : ''}><summary>Past sprints (${past.length})</summary>
           ${past.map(sprintBox).join('')}</details>` : ''}
       </section>
     </div>`;
 
-  root.querySelector('.new-task').addEventListener('click', () => openTaskEditor());
   root.querySelector('.new-sprint').addEventListener('click', () => openSprintEditor());
 
   root.addEventListener('click', (e) => {

@@ -258,7 +258,7 @@ export function render(view, openMenu = null) {
       </div>` : ''}
       ${filterMenus(openMenu)}
       <details class="view-menu">
-        <summary title="Which tasks to show">${icon('sliders', 15)} View</summary>
+        <summary title="View: which tasks to show" aria-label="View">${icon('sliders', 15)}</summary>
         <div class="menu">
           <label class="check"><input type="checkbox" data-opt="hideDone" ${hideDone ? 'checked' : ''}> Hide done</label>
           <label class="check"><input type="checkbox" data-opt="onlyLinked" ${opts.onlyLinked ? 'checked' : ''}> Linked tasks only</label>

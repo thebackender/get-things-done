@@ -2,7 +2,7 @@
 import { store, taskById, childrenOf, descendants, sprintById, sprintPhase, activeSprint, projectById, projectList, projectLabel, projectColor, updateTask } from '../store.js';
 import { openTaskEditor, openSprintEditor } from '../editor.js';
 import { projectChip, metaBadges, progressBar, sprintGoals, openContextMenu, taskMenuItems } from '../components.js';
-import { esc, prioIcon, prioClass, statusName, empty, freshBox, fmtDate, today, daysBetween, trunc, toast, PRIORITIES } from '../util.js';
+import { esc, prioIcon, prioClass, statusName, empty, freshBox, today, daysBetween, trunc, toast, PRIORITIES } from '../util.js';
 import { icon } from '../icons.js';
 import { getPrefs, setPrefs } from '../prefs.js';
 
@@ -139,10 +139,10 @@ function sprintLine(sprint) {
   const tasks = store.tasks.filter((t) => t.sprint_id === sprint.id);
   const done = tasks.filter((t) => t.status === 'done').length;
   const left = sprint.end ? daysBetween(today(), sprint.end) : null;
-  const timing = left == null ? '' : left >= 0 ? ` · ${left} day${left === 1 ? '' : 's'} left` : ` · <span class="overdue">${-left} day(s) overdue</span>`;
+  const timing = left == null ? '' : left >= 0 ? `${left} day${left === 1 ? '' : 's'} left` : `<span class="overdue">${-left} day(s) overdue</span>`;
   return `<div class="sprint-line">
     <div class="sprint-info">
-      <div><b>${esc(sprint.name)}</b> <span class="muted">${fmtDate(sprint.start)} – ${fmtDate(sprint.end)}${timing}</span></div>
+      <div><b>${esc(sprint.name)}</b> ${timing ? `<span class="muted days-left">${icon('clock', 13)}${timing}</span>` : ''}</div>
       ${sprintGoals(sprint)}
     </div>
     <span class="sprint-progress" title="${done} of ${tasks.length} done">${progressBar(done, tasks.length)} ${done}/${tasks.length}</span>
@@ -166,7 +166,7 @@ export function render(pane, opts = {}, openMenu = null) {
       </div>` : ''}
       ${filterMenus(openMenu)}
       <details class="view-menu">
-        <summary title="Sorting, grouping, done tasks">${icon('sliders', 15)} View</summary>
+        <summary title="View: sorting, grouping, done tasks" aria-label="View">${icon('sliders', 15)}</summary>
         <div class="menu">
           <label>Sort ${select('sort', SORTS)}</label>
           <label>Group ${select('group', GROUPS)}</label>
@@ -288,7 +288,7 @@ export function render(pane, opts = {}, openMenu = null) {
 function renderBody(root) {
   const body = root.querySelector('.tree');
   if (!store.tasks.length) {
-    body.innerHTML = empty('No tasks yet. Click "New task" or press <kbd>N</kbd>.');
+    body.innerHTML = empty('No tasks yet. Click + or press <kbd>N</kbd>.');
     return;
   }
 
