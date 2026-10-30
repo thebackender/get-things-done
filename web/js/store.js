@@ -94,7 +94,7 @@ async function run(promise, message) {
   try {
     const res = await promise;
     const text = typeof message === 'function' ? message(res) : message;
-    if (res?.goal_reached) toast('🎯 Goal reached, task marked done');
+    if (res?.goal_reached) toast('Goal reached, task marked done');
     else if (text) toast(text);
     return res;
   } catch (e) {

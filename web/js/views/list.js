@@ -3,6 +3,7 @@ import { store, taskById, childrenOf, sprintById, projectById, projectList, proj
 import { openTaskEditor } from '../editor.js';
 import { projectChip, metaBadges } from '../components.js';
 import { esc, prioIcon, prioClass, statusName, empty } from '../util.js';
+import { icon } from '../icons.js';
 
 const KEY = 'gtd.list';
 const state = { sort: 'priority', group: 'project', showDone: false, collapsed: [], ...JSON.parse(localStorage.getItem(KEY) || '{}'), q: '' };
@@ -93,7 +94,7 @@ function renderBody(root) {
     <section class="group">
       ${state.group !== 'none' ? `<h3>${color ? `<i class="dot" style="--c:${color}"></i>` : ''}${esc(name)} <span class="count">${items.length}</span></h3>` : ''}
       ${items.map((t) => tree(t, 0)).join('')}
-    </section>`).join('') || empty('All done 🎉 Turn on "show done" to see them.');
+    </section>`).join('') || empty('All done. Turn on "show done" to see finished tasks.');
 }
 
 function groups(roots) {
@@ -136,14 +137,14 @@ function row(t, depth, { flat = false, hasKids = false, collapsed = false } = {}
   const parent = flat && t.parent_id != null ? taskById(t.parent_id) : null;
   const sprint = t.sprint_id != null && state.group !== 'sprint' ? sprintById(t.sprint_id) : null;
   return `<div class="row st-${t.status} prio-${prioClass(t.priority)}" data-id="${t.id}" style="--depth:${depth}">
-    <span class="caret">${hasKids ? (collapsed ? '▸' : '▾') : ''}</span>
+    <span class="caret">${hasKids ? icon(collapsed ? 'chevronRight' : 'chevronDown', 14) : ''}</span>
     <input type="checkbox" class="done-toggle" ${t.status === 'done' ? 'checked' : ''} title="Done">
     ${prioIcon(t.priority)}
-    <span class="title">${esc(t.title)}${parent ? ` <span class="muted">← ${esc(parent.title)}</span>` : ''}</span>
+    <span class="title">${esc(t.title)}${parent ? ` <span class="muted">· in ${esc(parent.title)}</span>` : ''}</span>
     ${t.status === 'doing' ? '<span class="badge doing">in progress</span>' : ''}
     <span class="meta">
       ${metaBadges(t)}
-      ${sprint && sprint.status !== 'closed' ? `<span class="badge sprint" title="Sprint">🏃 ${esc(sprint.name)}</span>` : ''}
+      ${sprint && sprint.status !== 'closed' ? `<span class="badge sprint" title="Sprint">${icon('zap', 12)} ${esc(sprint.name)}</span>` : ''}
       ${state.group !== 'project' ? projectChip(t.project_id) : ''}
     </span>
   </div>`;

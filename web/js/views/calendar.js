@@ -3,6 +3,7 @@ import { store, activeSprint, isOverdue, projectColor, projectLabel, byPriority,
 import { openTaskEditor } from '../editor.js';
 import { cardClicks, dragAndDrop } from '../components.js';
 import { MONTHS, WEEKDAYS, esc, isoDate, today, prioClass, prioIcon, freshBox } from '../util.js';
+import { icon } from '../icons.js';
 
 let cursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let showDone = true;
@@ -11,7 +12,7 @@ function chip(t) {
   const overdue = isOverdue(t);
   return `<div class="cal-task st-${t.status} prio-${prioClass(t.priority)}${overdue ? ' overdue' : ''}" draggable="true" data-id="${t.id}"
     style="--c:${projectColor(t.project_id)}" title="${esc(t.title)}${t.project_id ? ` · ${esc(projectLabel(t.project_id))}` : ''}${overdue ? ' (overdue)' : ''}">
-    ${overdue ? '⚠ ' : ''}${prioIcon(t.priority)}${esc(t.title)}</div>`;
+    ${overdue ? icon('alert', 12, 'overdue-icon') : ''}${prioIcon(t.priority)}${esc(t.title)}</div>`;
 }
 
 export function render(view) {
@@ -49,9 +50,9 @@ export function render(view) {
   const noDue = store.tasks.filter((t) => !t.due && t.status !== 'done').length;
   root.innerHTML = `
     <div class="toolbar">
-      <button data-nav="-1" title="Previous month">‹</button>
+      <button class="icon" data-nav="-1" title="Previous month">${icon('chevronLeft')}</button>
       <button data-nav="0">Today</button>
-      <button data-nav="1" title="Next month">›</button>
+      <button class="icon" data-nav="1" title="Next month">${icon('chevronRight')}</button>
       <h2>${MONTHS[m]} ${y}</h2>
       <label class="check"><input type="checkbox" class="show-done" ${showDone ? 'checked' : ''}> show done</label>
       <span class="spacer"></span>

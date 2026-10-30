@@ -2,6 +2,7 @@
 import { taskById, childrenOf, blockers, isOverdue, goalSum, projectColor, projectLabel, addProgress } from './store.js';
 import { openTaskEditor } from './editor.js';
 import { esc, fmtDate, fmtNum, prioIcon, prioClass, trunc, toast } from './util.js';
+import { icon } from './icons.js';
 
 /** "Project" or "Project:Subproject" with the project's color dot. */
 export function projectChip(id) {
@@ -27,21 +28,21 @@ export function metaBadges(t) {
   const kids = childrenOf(t.id);
   if (kids.length) {
     const done = kids.filter((k) => k.status === 'done').length;
-    parts.push(`<span class="badge" title="Subtasks">☑ ${done}/${kids.length}</span>`);
+    parts.push(`<span class="badge" title="Subtasks">${icon('listChecks', 12)} ${done}/${kids.length}</span>`);
   }
   if (t.target != null) parts.push(goalBar(t));
   if (t.status === 'waiting') {
     const what = t.waiting_for ? esc(trunc(t.waiting_for, 28)) : 'waiting';
-    parts.push(`<span class="badge waiting" title="${esc(t.waiting_for)}">⏳ ${what}</span>`);
+    parts.push(`<span class="badge waiting" title="${esc(t.waiting_for)}">${icon('hourglass', 12)} ${what}</span>`);
   }
   const blocking = t.status !== 'done' ? blockers(t) : [];
   if (blocking.length) {
     const titles = blocking.map((b) => b.title).join(', ');
-    parts.push(`<span class="badge blocked" title="First: ${esc(titles)}">⛓ blocked</span>`);
+    parts.push(`<span class="badge blocked" title="First: ${esc(titles)}">${icon('lock', 12)} blocked</span>`);
   }
   if (t.due) {
     const overdue = isOverdue(t);
-    parts.push(`<span class="badge due${overdue ? ' overdue' : ''}" title="${overdue ? 'Overdue' : 'Due date'}">${overdue ? '⚠' : '📅'} ${fmtDate(t.due)}</span>`);
+    parts.push(`<span class="badge due${overdue ? ' overdue' : ''}" title="${overdue ? 'Overdue' : 'Due date'}">${icon(overdue ? 'alert' : 'calendar', 12)} ${fmtDate(t.due)}</span>`);
   }
   return parts.join('');
 }
@@ -49,10 +50,10 @@ export function metaBadges(t) {
 export function card(t, { depth = 0, showParent = true } = {}) {
   const parent = showParent && t.parent_id != null ? taskById(t.parent_id) : null;
   const progressBtn = t.target != null && t.status !== 'done'
-    ? `<button class="icon add-progress" data-progress="${t.id}" title="Add progress">+</button>` : '';
+    ? `<button class="icon add-progress" data-progress="${t.id}" title="Add progress">${icon('plus', 14)}</button>` : '';
   return `<div class="card st-${t.status} prio-${prioClass(t.priority)}" data-id="${t.id}" draggable="true" style="--depth:${depth}">
     <div class="card-top">${prioIcon(t.priority)}<span class="card-title">${esc(t.title)}</span>${progressBtn}</div>
-    ${parent ? `<div class="card-parent">↳ ${esc(parent.title)}</div>` : ''}
+    ${parent ? `<div class="card-parent">${icon('cornerDownRight', 12)} ${esc(parent.title)}</div>` : ''}
     <div class="card-meta">${projectChip(t.project_id)}${metaBadges(t)}</div>
   </div>`;
 }

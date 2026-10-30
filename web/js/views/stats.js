@@ -1,6 +1,7 @@
 // Stats tab: summary tiles and SVG charts.
 import { store, activeSprint, sprintOrder, isOverdue, goalSum, projectById, projectList, projectLabel } from '../store.js';
 import { PALETTE, OTHER_COLOR, PRIORITIES, esc, trunc, today, addDays, weekStart, fmtDate, fmtNum, daysBetween, freshBox, empty } from '../util.js';
+import { icon } from '../icons.js';
 
 // Charts are drawn at the card's actual width so text never gets stretched.
 // The markup holds an empty slot that is filled once it is in the DOM.
@@ -63,7 +64,7 @@ function columnChart(data, { color = BLUE, height = 190, aria }) {
     const max = niceMax(Math.max(0, ...data.map((d) => d.value)));
     const step = iw / data.length;
     const bw = Math.min(24, step * 0.6);
-    const every = Math.max(1, Math.ceil((data.length * 72) / iw));
+    const every = Math.max(1, Math.ceil((data.length * 60) / iw));
     const bars = data.map((d, i) => {
       const h = (d.value / max) * ih;
       const x = pad.l + i * step;
@@ -140,11 +141,11 @@ function tiles() {
   const tile = (value, label, sub = '', cls = '') =>
     `<div class="tile ${cls}"><div class="tile-value">${value}</div><div class="tile-label">${label}</div>${sub ? `<div class="tile-sub">${sub}</div>` : ''}</div>`;
   return `<div class="tiles">
-    ${tile(open.length, 'open', `${open.filter((t) => t.status === 'doing').length} in progress`)}
-    ${tile(open.filter((t) => t.status === 'waiting').length, '⏳ waiting')}
-    ${tile(done7, 'done in last 7 days')}
-    ${tile(overdue, overdue ? '⚠ overdue' : 'overdue', '', overdue ? 'critical' : '')}
-    ${tile(cycle ? `${fmtNum(cycle.avg.toFixed(1))} d` : '—', 'from in progress to done',
+    ${tile(open.length, 'Open tasks', `${open.filter((t) => t.status === 'doing').length} in progress`)}
+    ${tile(open.filter((t) => t.status === 'waiting').length, 'Waiting')}
+    ${tile(done7, 'Done, last 7 days')}
+    ${tile(overdue, 'Overdue', '', overdue ? 'critical' : '')}
+    ${tile(cycle ? `${fmtNum(cycle.avg.toFixed(1))} d` : '—', 'Avg. cycle time',
       cycle ? `across ${cycle.n} task(s)` : 'shows up once tasks go through "In progress"')}
   </div>`;
 }
@@ -194,7 +195,7 @@ function goals() {
     const sum = goalSum(t);
     const pct = Math.min(100, (sum / t.target) * 100);
     return `<div class="goal-row st-${t.status}">
-      <span class="goal-title">${t.status === 'done' ? '✓ ' : ''}${esc(t.title)}</span>
+      <span class="goal-title">${t.status === 'done' ? icon('check', 12) + ' ' : ''}${esc(t.title)}</span>
       <span class="track wide"><span class="fill" style="width:${pct}%"></span></span>
       <span class="goal-num">${fmtNum(sum)} / ${fmtNum(t.target)} ${esc(t.unit)}</span>
       <span class="muted">${t.due ? fmtDate(t.due) : ''}</span>

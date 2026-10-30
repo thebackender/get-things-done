@@ -1,6 +1,7 @@
 // Settings tab: manage projects and their subprojects (name, color, active).
 import { store, projectList, projectById, isSelectable, createProject, updateProject, deleteProject } from '../store.js';
 import { PALETTE, OTHER_COLOR, esc, empty, freshBox } from '../util.js';
+import { icon } from '../icons.js';
 
 const COLORS = [...PALETTE, OTHER_COLOR];
 const plural = (n) => `${n} task${n === 1 ? '' : 's'}`;
@@ -13,7 +14,7 @@ function projectRow(p) {
   const n = taskCount(p.id) + (isSub ? 0 : subprojectsOf(p.id).reduce((s, c) => s + taskCount(c.id), 0));
   const hiddenByParent = isSub && p.is_active && !isSelectable(p);
   return `<li class="${isSub ? 'sub' : 'root'}${isSelectable(p) ? '' : ' inactive'}" data-project="${p.id}">
-    <span class="name">${isSub ? '↳ ' : `<i class="dot" style="--c:${p.color}"></i>`}${esc(p.name)}</span>
+    <span class="name">${isSub ? icon('cornerDownRight', 14, 'muted') : `<i class="dot" style="--c:${p.color}"></i>`}${esc(p.name)}</span>
     <span class="muted">${plural(n)}</span>
     <label class="check" title="Inactive projects are hidden from the task editor's dropdown">
       <input type="checkbox" data-act="active" ${p.is_active ? 'checked' : ''}> active

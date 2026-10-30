@@ -8,6 +8,7 @@ import {
   dateInput, bindDateInputs, readDate,
 } from './util.js';
 import { comboHTML, bindCombos } from './combo.js';
+import { icon } from './icons.js';
 
 const dlg = document.getElementById('dialog');
 
@@ -128,9 +129,9 @@ export function openTaskEditor(task = null, preset = {}) {
   <form class="editor" novalidate>
     <header>
       <h2>${isNew ? (t.parent_id ? 'New subtask' : 'New task') : `Task #${t.id}`}</h2>
-      <button type="button" class="icon" data-act="close" title="Close (Esc)">✕</button>
+      <button type="button" class="icon" data-act="close" title="Close (Esc)">${icon('x')}</button>
     </header>
-    <input name="title" class="title-input" placeholder="What needs to be done?" value="${esc(t.title)}" autocomplete="off">
+    <input name="title" class="title-input" placeholder="What needs to be done?" value="${esc(t.title)}" autocomplete="off" autofocus>
     <div class="grid">
       <label>Status<select name="status">${STATUSES.map((s) => opt(s.value, s.name, t.status)).join('')}</select></label>
       <label>Priority<span class="with-icon"><span class="prio-preview">${prioIcon(t.priority)}</span><select name="priority">${PRIORITIES.map((p) => opt(p.value, p.name, t.priority)).join('')}</select></span></label>
@@ -143,7 +144,7 @@ export function openTaskEditor(task = null, preset = {}) {
         <span class="inline-new" hidden>
           <input class="new-project" placeholder="Project or Project:Subproject" autocomplete="off">
           <button type="button" data-act="add-project">Add</button>
-          <button type="button" class="icon" data-act="cancel-project" title="Cancel">✕</button>
+          <button type="button" class="icon" data-act="cancel-project" title="Cancel">${icon('x')}</button>
         </span>
       </div>
       <label>Due date${dateInput('due', t.due)}</label>
@@ -169,8 +170,8 @@ export function openTaskEditor(task = null, preset = {}) {
 
     ${isNew ? '' : `<details ${kids.length ? 'open' : ''}>
       <summary>Subtasks <span class="count">${kids.length}</span></summary>
-      <ul class="subtasks">${kids.map((k) => `<li class="st-${k.status}"><a href="#" data-open="${k.id}">${k.status === 'done' ? '✓ ' : ''}${esc(k.title)}</a></li>`).join('')}</ul>
-      <button type="button" data-act="add-sub">+ subtask</button>
+      <ul class="subtasks">${kids.map((k) => `<li class="st-${k.status}"><a href="#" data-open="${k.id}">${k.status === 'done' ? icon('check', 12) + ' ' : ''}${esc(k.title)}</a></li>`).join('')}</ul>
+      <button type="button" data-act="add-sub">${icon('plus', 14)} Subtask</button>
     </details>`}
 
     ${history.length ? `<details><summary>History</summary><ul class="history">${history.map(historyLine).join('')}</ul></details>` : ''}
@@ -204,7 +205,7 @@ export function openTaskEditor(task = null, preset = {}) {
       </div>
       <ul class="progress-list">${progress.map((p, i) => ({ p, i })).reverse().map(({ p, i }) =>
         `<li><time>${fmtDate(p.date)}</time> ${p.value > 0 ? '+' : ''}${fmtNum(p.value)} ${unit}
-         <button type="button" class="icon" data-act="del-progress" data-i="${i}" title="Delete entry">✕</button></li>`).join('')}</ul>`;
+         <button type="button" class="icon" data-act="del-progress" data-i="${i}" title="Delete entry">${icon('x', 14)}</button></li>`).join('')}</ul>`;
   }
   renderProgress();
 
@@ -393,7 +394,7 @@ export function openSprintEditor(sprint = null) {
 
   dlg.innerHTML = `
   <form class="editor narrow" novalidate>
-    <header><h2>${isNew ? 'New sprint' : 'Sprint'}</h2><button type="button" class="icon" data-act="close">✕</button></header>
+    <header><h2>${isNew ? 'New sprint' : 'Sprint'}</h2><button type="button" class="icon" data-act="close">${icon('x')}</button></header>
     <label>Name<input name="name" value="${esc(s.name)}" autocomplete="off"></label>
     <div class="grid">
       <label>Start${dateInput('start', s.start)}</label>
