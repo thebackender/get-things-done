@@ -3,7 +3,7 @@
 // Layered layout: each group of linked tasks is laid out in columns by depth, groups are packed into rows.
 import { store, taskById, activeSprint, updateTask } from '../store.js';
 import { openTaskEditor } from '../editor.js';
-import { projectChip, metaBadges, openContextMenu, taskMenuItems } from '../components.js';
+import { projectChip, metaBadges, doingBadge, openContextMenu, taskMenuItems } from '../components.js';
 import { esc, prioIcon, prioClass, prioName, empty, freshBox, trunc, toast } from '../util.js';
 import { icon } from '../icons.js';
 import { getPrefs, setPrefs } from '../prefs.js';
@@ -215,7 +215,7 @@ function nodeHTML(t, p) {
   return `<foreignObject x="${p.x}" y="${p.y}" width="${W}" height="${H}" data-node="${t.id}">
     <div xmlns="http://www.w3.org/1999/xhtml" class="gnode ${cls}" title="${esc(t.title)} · ${prioName(t.priority)}">
       <div class="gnode-top">${prioIcon(t.priority)}<span class="title">${esc(t.title)}</span></div>
-      <div class="gnode-meta">${t.status === 'doing' ? '<span class="badge doing">in progress</span>' : ''}${metaBadges(t)}${projectChip(t.project_id)}</div>
+      <div class="gnode-meta">${doingBadge(t)}${metaBadges(t)}${projectChip(t.project_id)}</div>
     </div>
   </foreignObject>`;
 }

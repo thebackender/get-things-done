@@ -1,7 +1,7 @@
 // Shared markup and behavior: task card, badges, drag and drop.
 import { taskById, childrenOf, descendants, blockers, isOverdue, goalSum, projectColor, projectLabel, addProgress, updateTask, deleteTask } from './store.js';
 import { openTaskEditor } from './editor.js';
-import { esc, fmtDate, fmtNum, prioIcon, prioClass, trunc, toast } from './util.js';
+import { esc, fmtDate, fmtNum, prioIcon, prioClass, toast } from './util.js';
 import { icon } from './icons.js';
 
 /** "Project" or "Project:Subproject" with the project's color dot. */
@@ -32,13 +32,13 @@ export function metaBadges(t) {
   }
   if (t.target != null) parts.push(goalBar(t));
   if (t.status === 'waiting') {
-    const what = t.waiting_for ? esc(trunc(t.waiting_for, 28)) : 'waiting';
-    parts.push(`<span class="badge waiting" title="${esc(t.waiting_for)}">${icon('hourglass', 12)} ${what}</span>`);
+    const tip = t.waiting_for ? `Waiting for: ${esc(t.waiting_for)}` : 'Waiting';
+    parts.push(`<span class="badge waiting icon-only" title="${tip}" aria-label="${tip}">${icon('hourglass', 12)}</span>`);
   }
   const blocking = t.status !== 'done' ? blockers(t) : [];
   if (blocking.length) {
     const titles = blocking.map((b) => b.title).join(', ');
-    parts.push(`<span class="badge blocked" title="First: ${esc(titles)}">${icon('lock', 12)} blocked</span>`);
+    parts.push(`<span class="badge blocked icon-only" title="Blocked by: ${esc(titles)}" aria-label="Blocked">${icon('lock', 12)}</span>`);
   }
   if (t.due) {
     const overdue = isOverdue(t);
@@ -46,6 +46,10 @@ export function metaBadges(t) {
   }
   return parts.join('');
 }
+
+/** "In progress" as an icon, for tasks with status doing. */
+export const doingBadge = (t) =>
+  t.status === 'doing' ? `<span class="badge doing icon-only" title="In progress" aria-label="In progress">${icon('loader', 12)}</span>` : '';
 
 export function card(t, { depth = 0, showParent = true, note = '' } = {}) {
   const parent = showParent && t.parent_id != null ? taskById(t.parent_id) : null;

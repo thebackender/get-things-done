@@ -253,6 +253,10 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
 .chip, .badge.outline { background: var(--background); border-color: var(--border); }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
 .badge.doing { background: var(--doing-bg); color: var(--doing-fg); }
+/* In progress: the loader turns slowly, one spoke at a time. */
+.badge.doing .i { animation: spin 1.6s steps(8) infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .badge.doing .i { animation: none; } }
 .badge.waiting { background: var(--waiting-bg); color: var(--waiting-fg); }
 .badge.blocked { background: var(--blocked-bg); color: var(--blocked-fg); }
 .badge.due.overdue { background: var(--destructive-bg); color: var(--destructive); font-weight: 600; }

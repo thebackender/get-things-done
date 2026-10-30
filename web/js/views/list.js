@@ -1,7 +1,7 @@
 // Task list (left side of the Tasks tab): task tree with search, a Sprint / All filter, sorting and grouping.
 import { store, taskById, childrenOf, descendants, sprintById, sprintPhase, activeSprint, projectById, projectList, projectLabel, projectColor, updateTask } from '../store.js';
 import { openTaskEditor, openSprintEditor } from '../editor.js';
-import { projectChip, metaBadges, progressBar, sprintGoals, openContextMenu, taskMenuItems } from '../components.js';
+import { projectChip, metaBadges, doingBadge, progressBar, sprintGoals, openContextMenu, taskMenuItems } from '../components.js';
 import { esc, prioIcon, prioClass, statusName, empty, freshBox, today, daysBetween, trunc, toast, PRIORITIES } from '../util.js';
 import { icon } from '../icons.js';
 import { getPrefs, setPrefs } from '../prefs.js';
@@ -357,7 +357,7 @@ function row(t, depth, { flat = false, hasKids = false, collapsed = false } = {}
     <input type="checkbox" class="done-toggle" ${t.status === 'done' ? 'checked' : ''} title="Done">
     ${prioIcon(t.priority)}
     <span class="title">${esc(t.title)}${parent ? ` <span class="muted">· in ${esc(parent.title)}</span>` : ''}</span>
-    ${t.status === 'doing' ? '<span class="badge doing">in progress</span>' : ''}
+    ${doingBadge(t)}
     <span class="meta">
       ${metaBadges(t)}
       ${sprint && sprintPhase(sprint) !== 'past' ? `<span class="badge sprint icon-only" title="Sprint: ${esc(sprint.name)}">${icon('zap', 12)}</span>` : ''}
