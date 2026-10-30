@@ -1,7 +1,7 @@
 // Task list (left side of the Tasks tab): task tree with search, a Sprint / All filter, sorting and grouping.
-import { store, taskById, childrenOf, sprintById, activeSprint, projectById, projectList, projectLabel, projectColor, byPriority, byDue, updateTask } from '../store.js';
+import { store, taskById, childrenOf, sprintById, sprintPhase, activeSprint, projectById, projectList, projectLabel, projectColor, byPriority, byDue, updateTask } from '../store.js';
 import { openTaskEditor, openSprintEditor } from '../editor.js';
-import { projectChip, metaBadges, progressBar } from '../components.js';
+import { projectChip, metaBadges, progressBar, sprintGoals } from '../components.js';
 import { esc, prioIcon, prioClass, statusName, empty, freshBox, fmtDate, today, daysBetween } from '../util.js';
 import { icon } from '../icons.js';
 import { getPrefs, setPrefs } from '../prefs.js';
@@ -56,7 +56,7 @@ function sprintLine(sprint) {
   return `<div class="sprint-line">
     <div class="sprint-info">
       <div><b>${esc(sprint.name)}</b> <span class="muted">${fmtDate(sprint.start)} – ${fmtDate(sprint.end)}${timing}</span></div>
-      ${sprint.goal ? `<div class="sprint-goal">${icon('target', 13)} ${esc(sprint.goal)}</div>` : ''}
+      ${sprintGoals(sprint)}
     </div>
     <span class="sprint-progress" title="${done} of ${tasks.length} done">${progressBar(done, tasks.length)} ${done}/${tasks.length}</span>
     <button class="icon edit-sprint" title="Edit sprint">${icon('pencil', 15)}</button>
@@ -188,7 +188,7 @@ function groups(roots) {
     keys.sort((a, b) => STATUS_ORDER[a] - STATUS_ORDER[b]);
     return keys.map((k) => ({ name: statusName(k), items: map.get(k) }));
   }
-  const rank = (k) => (k === '' ? 3 : { active: 0, planned: 1, closed: 2 }[sprintById(k)?.status] ?? 3);
+  const rank = (k) => (k === '' || !sprintById(k) ? 3 : { current: 0, future: 1, past: 2 }[sprintPhase(sprintById(k))]);
   keys.sort((a, b) => rank(a) - rank(b));
   return keys.map((k) => ({ name: k === '' ? 'Backlog' : sprintById(k)?.name ?? `Sprint #${k}`, items: map.get(k) }));
 }
@@ -211,7 +211,7 @@ function row(t, depth, { flat = false, hasKids = false, collapsed = false } = {}
     ${t.status === 'doing' ? '<span class="badge doing">in progress</span>' : ''}
     <span class="meta">
       ${metaBadges(t)}
-      ${sprint && sprint.status !== 'closed' ? `<span class="badge sprint icon-only" title="Sprint: ${esc(sprint.name)}">${icon('zap', 12)}</span>` : ''}
+      ${sprint && sprintPhase(sprint) !== 'past' ? `<span class="badge sprint icon-only" title="Sprint: ${esc(sprint.name)}">${icon('zap', 12)}</span>` : ''}
       ${state.group !== 'project' ? projectChip(t.project_id) : ''}
     </span>
   </div>`;

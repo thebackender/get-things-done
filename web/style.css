@@ -367,7 +367,13 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
 .sprint-info { flex: 1; min-width: 0; }
 .sprint-info .muted { font-size: 13px; }
 .sprint-info .overdue { color: var(--destructive); }
-.sprint-goal { display: flex; align-items: center; gap: 6px; margin-top: 2px; color: var(--muted-foreground); font-size: 13px; }
+/* A sprint's goals: one item per line. */
+.sprint-goals { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; color: var(--muted-foreground); font-size: 13px; }
+.sprint-goals li { display: flex; align-items: center; gap: 6px; }
+.goals-edit { display: flex; flex-direction: column; gap: 6px; }
+.sgoal-row { display: flex; align-items: center; gap: 8px; color: var(--muted-foreground); }
+.sgoal-row input { flex: 1; min-width: 0; color: var(--foreground); }
+.sgoal-row button.icon { width: 28px; height: 28px; }
 .sprint-line .track.wide { width: 72px; }
 .sprint-info .muted { white-space: nowrap; }
 .badge.icon-only { padding: 0 5px; }
@@ -380,14 +386,19 @@ main { padding: 24px; max-width: 1440px; margin: 0 auto; }
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 12px; margin-bottom: 12px; box-shadow: var(--shadow-xs);
 }
-.sprint-box.active { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
-.sprint-box header { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.sprint-box.current { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.sprint-box header { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; user-select: none; }
+.sprint-box.open header { margin-bottom: 10px; }
+.sprint-box header .caret { display: inline-flex; margin-top: 2px; color: var(--muted-foreground); }
+.sprint-box .sprint-title { flex: 1; min-width: 0; }
+.sprint-box header:hover .caret { color: var(--foreground); }
 .sprint-box header .muted { font-size: 13px; margin-top: 2px; }
 .sprint-box .actions { display: flex; align-items: center; gap: 6px; }
 .sprint-box .actions button:not(.icon) { height: 30px; padding: 0 10px; font-size: 13px; }
 .closed-sprints { margin-top: 12px; color: var(--muted-foreground); font-size: 13px; }
 .closed-sprints summary { cursor: pointer; font-weight: 500; }
-.closed-sprints ul { padding-left: 18px; }
+.closed-sprints summary { margin-bottom: 10px; }
+.closed-sprints .sprint-box { color: var(--foreground); font-size: 14px; }
 
 /* ---------- calendar ---------- */
 
@@ -441,7 +452,7 @@ button.more:hover:not(:disabled) { background: var(--accent); color: var(--foreg
   display: grid; grid-template-columns: minmax(0, 1fr) var(--cal-w); gap: 24px; align-items: start;
 }
 .cal-pane { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow: auto; }
-.cal-pane .toolbar { flex-wrap: nowrap; margin-bottom: 12px; }
+.cal-pane .toolbar { margin-bottom: 12px; }
 .list-toolbar { margin-bottom: 12px; }
 .list-toolbar .q { flex: 1; min-width: 160px !important; }
 .row[draggable] { -webkit-user-drag: element; }
@@ -673,6 +684,7 @@ dialog {
   box-shadow: var(--shadow-lg);
 }
 dialog::backdrop { background: var(--overlay); }
+dialog:has(.editor.narrow) { width: min(510px, calc(100vw - 32px)); }
 .editor { display: flex; flex-direction: column; gap: 14px; padding: 22px 24px 0; }
 .editor.narrow { max-width: 460px; }
 .editor header, .editor footer { display: flex; align-items: center; gap: 8px; }

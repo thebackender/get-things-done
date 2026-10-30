@@ -47,13 +47,14 @@ export function metaBadges(t) {
   return parts.join('');
 }
 
-export function card(t, { depth = 0, showParent = true } = {}) {
+export function card(t, { depth = 0, showParent = true, note = '' } = {}) {
   const parent = showParent && t.parent_id != null ? taskById(t.parent_id) : null;
   const progressBtn = t.target != null && t.status !== 'done'
     ? `<button class="icon add-progress" data-progress="${t.id}" title="Add progress">${icon('plus', 14)}</button>` : '';
   return `<div class="card st-${t.status} prio-${prioClass(t.priority)}" data-id="${t.id}" draggable="true" style="--depth:${depth}">
     <div class="card-top">${prioIcon(t.priority)}<span class="card-title">${esc(t.title)}</span>${progressBtn}</div>
     ${parent ? `<div class="card-parent">${icon('cornerDownRight', 12)} ${esc(parent.title)}</div>` : ''}
+    ${note ? `<div class="card-parent">${icon('undo', 12)} ${esc(note)}</div>` : ''}
     <div class="card-meta">${projectChip(t.project_id)}${metaBadges(t)}</div>
   </div>`;
 }
@@ -106,4 +107,10 @@ export function dragAndDrop(root, selector, onDrop) {
     const id = Number(e.dataTransfer.getData('text/plain'));
     if (id) onDrop(id, zone);
   });
+}
+
+/** A sprint's goals as a list of items. */
+export function sprintGoals(s) {
+  return s.goals?.length
+    ? `<ul class="sprint-goals">${s.goals.map((g) => `<li>${icon('target', 12)}<span>${esc(g)}</span></li>`).join('')}</ul>` : '';
 }

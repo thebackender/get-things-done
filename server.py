@@ -32,7 +32,7 @@ THEMES = ("light", "dark", "system")
 SETTINGS_MAX_BYTES = 64 * 1024
 
 TASK_STATUSES = ("todo", "doing", "waiting", "done")
-SPRINT_STATUSES = ("planned", "active", "closed")
+MAX_SPRINT_GOALS = 20
 TRACKED_FIELDS = ("status", "sprint_id", "priority", "due")
 
 TASK_DEFAULTS = {
@@ -53,7 +53,8 @@ TASK_DEFAULTS = {
     "done_at": None,
     "is_deleted": False,
 }
-SPRINT_DEFAULTS = {"name": "", "start": None, "end": None, "goal": "", "status": "planned", "is_deleted": False}
+# A sprint has no status: it is current while today is between start and end.
+SPRINT_DEFAULTS = {"name": "", "start": None, "end": None, "goals": [], "is_deleted": False}
 PROJECT_DEFAULTS = {"name": "", "parent_id": None, "color": "#9a9893", "is_active": True, "is_deleted": False}
 # Deleting never removes records: it sets is_deleted. Deleted items are hidden from the UI
 # but stay in planner.json with all their links, so setting is_deleted back to false restores them.
@@ -102,8 +103,9 @@ def load():
         for key, value in TASK_DEFAULTS.items():
             task.setdefault(key, copy.deepcopy(value))
     for sprint in data["sprints"]:
+        migrate_sprint(sprint)
         for key, value in SPRINT_DEFAULTS.items():
-            sprint.setdefault(key, value)
+            sprint.setdefault(key, copy.deepcopy(value))
     for project in data["projects"]:
         for key, value in PROJECT_DEFAULTS.items():
             project.setdefault(key, value)
@@ -118,6 +120,14 @@ def live(items):
 def next_color(projects):
     used = {p["color"].lower() for p in live(projects) if p["parent_id"] is None}
     return next((color for color in PALETTE if color not in used), OTHER_COLOR)
+
+
+def migrate_sprint(sprint):
+    """Older sprints had a status and one goal text; now the dates decide, and goals are a list (one per line)."""
+    sprint.pop("status", None)
+    if "goal" in sprint:
+        old = sprint.pop("goal") or ""
+        sprint.setdefault("goals", [line.strip() for line in str(old).splitlines() if line.strip()])
 
 
 def migrate_categories(data):
@@ -381,13 +391,14 @@ def clean_sprint(payload):
             value = as_str(value).strip()
             if not value:
                 raise ApiError("Sprint name cannot be empty")
-        elif key == "goal":
-            value = as_str(value).strip()
+        elif key == "goals":
+            if not isinstance(value, list):
+                raise ApiError("goals must be a list")
+            value = [g for g in (as_str(item).strip() for item in value) if g]
+            if len(value) > MAX_SPRINT_GOALS:
+                raise ApiError(f"A sprint can have at most {MAX_SPRINT_GOALS} goals")
         elif key in ("start", "end"):
             value = as_date(value, key)
-        elif key == "status":
-            if value not in SPRINT_STATUSES:
-                raise ApiError(f"Unknown sprint status: {value}")
         out[key] = value
     return out
 
@@ -573,22 +584,15 @@ def add_progress(data, task_id, payload):
 # ---------- sprints ----------
 
 def check_sprint(data, sprint):
-    if sprint["start"] and sprint["end"] and sprint["end"] < sprint["start"]:
+    """Dates are required and sprints can't overlap, so at most one sprint is current on any day."""
+    if not sprint["start"] or not sprint["end"]:
+        raise ApiError("A sprint needs a start and an end date")
+    if sprint["end"] < sprint["start"]:
         raise ApiError("Sprint end is before its start")
-    if sprint["status"] == "active":
-        for other in live(data["sprints"]):
-            if other is not sprint and other["status"] == "active":
-                raise ApiError(f"Sprint \"{other['name']}\" is already active. Close it first.")
-
-
-def release_sprint_tasks(data, sprint_id, only_unfinished):
-    moved = 0
-    for task in live(data["tasks"]):
-        if task["sprint_id"] == sprint_id and not (only_unfinished and task["status"] == "done"):
-            log(data, task["id"], "sprint_id", sprint_id, None)
-            task["sprint_id"] = None
-            moved += 1
-    return moved
+    for other in live(data["sprints"]):
+        if other is not sprint and other["start"] and other["end"] \
+                and sprint["start"] <= other["end"] and other["start"] <= sprint["end"]:
+            raise ApiError(f"Dates overlap with sprint \"{other['name']}\" ({other['start']} – {other['end']})")
 
 
 def create_sprint(data, payload):
@@ -603,13 +607,9 @@ def create_sprint(data, payload):
 
 def update_sprint(data, sprint_id, payload):
     sprint = find(data["sprints"], sprint_id, "Sprint")
-    old_status = sprint["status"]
     sprint.update(clean_sprint(payload))
     check_sprint(data, sprint)
-    moved = 0
-    if sprint["status"] == "closed" and old_status != "closed":
-        moved = release_sprint_tasks(data, sprint_id, only_unfinished=True)
-    return {"item": sprint, "moved_to_backlog": moved}
+    return {"item": sprint}
 
 
 def delete_sprint(data, sprint_id):

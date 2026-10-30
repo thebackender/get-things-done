@@ -1,6 +1,6 @@
 // Modal dialogs: task editor and sprint editor (one shared <dialog>).
 import {
-  store, taskById, childrenOf, descendants, projectList, projectLabel, isSelectable, createProject, sprintById, sprintOrder,
+  store, taskById, childrenOf, descendants, projectList, projectLabel, isSelectable, createProject, sprintById, sprintOrder, sprintPhase,
   createTask, updateTask, deleteTask, createSprint, updateSprint, deleteSprint,
 } from './store.js';
 import {
@@ -118,7 +118,7 @@ export function openTaskEditor(task = null, preset = {}) {
   const blockedBy = t.depends_on;
   const blocking = isNew ? [] : store.tasks.filter((x) => x.depends_on.includes(t.id)).map((x) => x.id);
   const others = store.tasks.filter((x) => x.id !== t.id);
-  const sprints = store.sprints.filter((s) => s.status !== 'closed' || s.id === t.sprint_id).sort(sprintOrder);
+  const sprints = store.sprints.filter((s) => sprintPhase(s) !== 'past' || s.id === t.sprint_id).sort(sprintOrder);
   const kids = isNew ? [] : childrenOf(t.id);
   const history = isNew ? [] : store.history.filter((h) => h.task_id === t.id).slice(-10).reverse();
   const isGoal = t.target != null;
@@ -149,7 +149,7 @@ export function openTaskEditor(task = null, preset = {}) {
       </div>
       <label>Due date${dateInput('due', t.due)}</label>
       <div class="field">Parent${comboHTML('parent_id', parents.map((p) => ({ value: p.id, label: p.title, hint: projectLabel(p.project_id) })), t.parent_id, { placeholder: '— none — (type to search)' })}</div>
-      <label>Sprint<select name="sprint_id"><option value="">Backlog</option>${sprints.map((s) => opt(s.id, s.name + (s.status === 'active' ? ' (active)' : ''), t.sprint_id)).join('')}</select></label>
+      <label>Sprint<select name="sprint_id"><option value="">Backlog</option>${sprints.map((s) => opt(s.id, s.name + ({ current: ' (current)', past: ' (ended)' }[sprintPhase(s)] ?? ''), t.sprint_id)).join('')}</select></label>
     </div>
     <label class="waiting-row" ${t.status === 'waiting' ? '' : 'hidden'}>Waiting for<input name="waiting_for" value="${esc(t.waiting_for)}" placeholder="e.g. reply from the visa office"></label>
     <label>Notes<textarea name="notes" rows="4">${esc(t.notes)}</textarea></label>
@@ -380,6 +380,9 @@ export function openTaskEditor(task = null, preset = {}) {
   initial = snapshot(); // after everything is rendered, so the starting state counts as "no changes"
 }
 
+const goalRow = (g) => `<div class="sgoal-row">${icon('target', 14)}<input name="goal" value="${esc(g)}" placeholder="Add a goal…" autocomplete="off">
+  <button type="button" class="icon" data-act="remove-goal" title="Remove goal">${icon('x', 14)}</button></div>`;
+
 /** Open the sprint editor. sprint = null creates a new sprint. */
 export function openSprintEditor(sprint = null) {
   const isNew = !sprint;
@@ -387,7 +390,7 @@ export function openSprintEditor(sprint = null) {
   if (isNew) {
     const lastEnd = store.sprints.map((x) => x.end).filter(Boolean).sort().at(-1);
     const start = lastEnd && lastEnd >= today() ? addDays(lastEnd, 1) : today();
-    s = { name: `Sprint ${store.sprints.length + 1}`, start, end: addDays(start, 6), goal: '', status: 'planned' };
+    s = { name: `Sprint ${store.sprints.length + 1}`, start, end: addDays(start, 6), goals: [] };
   }
   const count = isNew ? 0 : store.tasks.filter((x) => x.sprint_id === s.id).length;
   beforeClose = null; // the sprint editor closes without asking
@@ -400,8 +403,10 @@ export function openSprintEditor(sprint = null) {
       <label>Start${dateInput('start', s.start)}</label>
       <label>End${dateInput('end', s.end)}</label>
     </div>
-    <label>Sprint goal<textarea name="goal" rows="2" placeholder="What I want to achieve in these days">${esc(s.goal)}</textarea></label>
-    ${isNew ? '' : `<p class="muted">Status: ${s.status} · tasks: ${count}</p>`}
+    <div class="field">Goals
+      <div class="goals-edit">${[...s.goals, ''].map(goalRow).join('')}</div>
+    </div>
+    ${isNew ? '' : `<p class="muted">${{ current: 'Current sprint', future: 'Upcoming', past: 'Ended' }[sprintPhase(s)]} · tasks: ${count}</p>`}
     <footer>
       ${isNew ? '' : '<button type="button" class="danger" data-act="delete">Delete</button>'}
       <span class="spacer"></span>
@@ -419,16 +424,39 @@ export function openSprintEditor(sprint = null) {
     if (start === undefined) return;
     const end = readDate(el.end, 'End');
     if (end === undefined) return;
-    const data = { name: el.name.value.trim(), start, end, goal: el.goal.value.trim() };
+    const goals = [...form.querySelectorAll('input[name="goal"]')].map((i) => i.value.trim()).filter(Boolean);
+    const data = { name: el.name.value.trim(), start, end, goals };
     if (!data.name) return el.name.focus();
-    if (data.start && data.end && data.end < data.start) return toast('Sprint end is before its start', 'error');
+    if (!data.start || !data.end) return toast('A sprint needs a start and an end date', 'error');
+    if (data.end < data.start) return toast('Sprint end is before its start', 'error');
     dlg.close();
     if (isNew) await createSprint(data);
     else await updateSprint(s.id, data);
   };
+  // Goals: one input per goal; there is always an empty one at the end to type the next goal into.
+  const goalsBox = form.querySelector('.goals-edit');
+  const addGoalRow = () => {
+    goalsBox.insertAdjacentHTML('beforeend', goalRow(''));
+    goalsBox.lastElementChild.querySelector('input').focus();
+  };
+  goalsBox.addEventListener('input', (e) => {
+    if (e.target === goalsBox.lastElementChild?.querySelector('input') && e.target.value.trim()) goalsBox.insertAdjacentHTML('beforeend', goalRow(''));
+  });
+  goalsBox.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.target.name !== 'goal') return;
+    e.preventDefault(); // Enter goes to the next goal instead of saving
+    const next = e.target.closest('.sgoal-row').nextElementSibling?.querySelector('input');
+    if (next) next.focus();
+    else if (e.target.value.trim()) addGoalRow();
+  });
   form.onclick = (e) => {
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'close') dlg.close();
+    if (act === 'remove-goal') {
+      const row = e.target.closest('.sgoal-row');
+      if (goalsBox.children.length > 1) row.remove();
+      else row.querySelector('input').value = '';
+    }
     if (act === 'delete' && confirm(`Delete sprint "${s.name}"?${count ? ` Its ${count} task(s) will go back to the backlog.` : ''}`)) {
       dlg.close();
       deleteSprint(s.id);

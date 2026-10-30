@@ -16,15 +16,15 @@ The server listens on `127.0.0.1` only, so it isn't reachable from the network.
 
 | Tab | What it does |
 |---|---|
-| Tasks | Task list on the left, calendar on the right; both show the same tasks. **Sprint** shows only the active sprint's tasks, with its dates, days left, progress and goal above the list; **All** shows everything. View: sort, group by project, status or sprint, show done tasks. Drag a task from the list onto a calendar day to set its due date |
-| Backlog | Tasks without a sprint. Drag a task into a sprint and its unfinished subtasks come along. Create, start and close sprints here |
+| Tasks | Task list on the left, calendar on the right; both show the same tasks. **Sprint** shows only the current sprint's tasks, with its dates, days left, progress and goals above the list; **All** shows everything. View: sort, group by project, status or sprint, show done tasks. Drag a task from the list onto a calendar day to set its due date |
+| Backlog | Unfinished tasks without a sprint, plus those left over from sprints that have ended. Sprints are collapsed: click one to see its tasks. Drag a task onto a sprint (open or not) and its unfinished subtasks come along. Create and edit sprints here |
 | Graph | Tasks as nodes. Solid line: subtask. Dashed arrow A ⇢ B: A blocks B |
 | Stats | Summary, done per week, sprint burndown, projects, priorities, velocity, goals |
 | Projects | Projects and subprojects: create, rename, delete, pick a color, mark active or inactive |
 
 ### Calendar
 
-The calendar starts at the active sprint (at today if no sprint is active); the Sprint button brings you back.
+The calendar starts at the current sprint (at today if there is none); the Sprint button brings you back.
 Month view: 5 weeks from the sprint's first week (or the whole sprint if it's longer), square cells, up to 3 tasks per day ("+N more" opens the rest), every other month tinted. Drag a task to another day to move its due date.
 Year view: 12 months from the sprint's month; a dot marks days with tasks (red: overdue, orange: urgent), click a day to see its tasks. Click an empty day in either view to add a task.
 
@@ -73,12 +73,18 @@ Everywhere in the UI a task's project shows as `Project` or `Project:Subproject`
 - Deleting a project also deletes its subprojects; their tasks stay, just without a project.
 - Project names cannot contain `:`.
 
+### Sprints
+
+`sprints` is a list of `{id, name, start, end, goals}`. There is no status: a sprint is current while today is between `start` and `end`
+(both required, sprints can't overlap), upcoming before that and past after it. `goals` is a list of strings, one per goal.
+Unfinished tasks of a past sprint keep their `sprint_id` but show up in the backlog until you drag them into another sprint.
+
 `history` records changes to status, sprint, priority, due date and progress (last 5000 entries). Burndown and cycle time are computed from it.
 
 ### UI settings
 
 `data/settings.json` keeps the theme and each tab's view options: the Sprint / All filter, sorting, grouping, "show done" and collapsed tasks in the list,
-the year/month view of the calendar, the checkboxes in Graph, the goal picked in Stats. The page saves it as you change things.
+the year/month view of the calendar, which sprints are open in Backlog, the checkboxes in Graph, the goal picked in Stats. The page saves it as you change things.
 It is separate from `planner.json`: no undo, no history, no backups. Delete it to reset everything to defaults.
 
 ```json

@@ -46,13 +46,28 @@ export function descendants(id) {
 }
 
 export const sprintById = (id) => store.sprints.find((s) => s.id === id);
-export const activeSprint = () => store.sprints.find((s) => s.status === 'active');
+// Sprints have no status: the dates decide. The server keeps sprints from overlapping.
+/** 'past', 'current' or 'future'. */
+export function sprintPhase(s) {
+  const now = today();
+  if (s.end < now) return 'past';
+  return s.start > now ? 'future' : 'current';
+}
+/** The sprint today falls into, if any. */
+export const activeSprint = () => store.sprints.find((s) => sprintPhase(s) === 'current');
 
-/** Sprint order: active, planned by date, closed (newest first). */
+/** Sprint order: current, upcoming (soonest first), past (latest first). */
 export function sprintOrder(a, b) {
-  const rank = { active: 0, planned: 1, closed: 2 };
-  return rank[a.status] - rank[b.status] ||
-    (a.status === 'closed' ? (b.start || '').localeCompare(a.start || '') : (a.start || '').localeCompare(b.start || ''));
+  const rank = { current: 0, future: 1, past: 2 };
+  const pa = sprintPhase(a);
+  return rank[pa] - rank[sprintPhase(b)] || (pa === 'past' ? b.start.localeCompare(a.start) : a.start.localeCompare(b.start));
+}
+
+/** Unfinished tasks with no sprint, or left over in a sprint that has ended, belong to the backlog. */
+export function inBacklog(t) {
+  if (t.status === 'done') return false;
+  const s = t.sprint_id != null ? sprintById(t.sprint_id) : null;
+  return !s || sprintPhase(s) === 'past';
 }
 
 /** Unfinished tasks that t depends on. */
@@ -115,7 +130,7 @@ export const addProgress = (id, value, date) => run(api.post(`/api/tasks/${id}/p
 
 export const createSprint = (data) => run(api.post('/api/sprints', data));
 export const updateSprint = (id, data) =>
-  run(api.put(`/api/sprints/${id}`, data), (r) => (r.moved_to_backlog ? `${r.moved_to_backlog} task(s) moved back to the backlog` : null));
+  run(api.put(`/api/sprints/${id}`, data));
 export const deleteSprint = (id) => run(api.del(`/api/sprints/${id}`), 'Sprint deleted');
 
 /** Create a project. {path: "A" or "A:B"} finds or creates; {name, parent_id} creates exactly that. */

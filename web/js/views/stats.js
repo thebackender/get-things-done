@@ -1,5 +1,5 @@
 // Stats tab: summary tiles and SVG charts.
-import { store, activeSprint, sprintOrder, isOverdue, goalSum, projectById, projectList, projectLabel } from '../store.js';
+import { store, activeSprint, sprintPhase, sprintOrder, isOverdue, goalSum, projectById, projectList, projectLabel } from '../store.js';
 import { PALETTE, OTHER_COLOR, PRIORITIES, esc, trunc, today, addDays, weekStart, fmtDate, fmtNum, daysBetween, freshBox, empty, paint } from '../util.js';
 import { getPrefs, setPrefs } from '../prefs.js';
 import { icon } from '../icons.js';
@@ -9,7 +9,8 @@ import { icon } from '../icons.js';
 // and again when that width changes (window resize, scrollbar, grid reflow).
 let slots = [];
 const drawnWidth = new WeakMap();
-const observer = new ResizeObserver((entries) => entries.forEach((e) => drawSlot(e.target)));
+// Redraw on the next frame: redrawing inside the callback changes the size again and the browser warns about a loop.
+const observer = new ResizeObserver((entries) => requestAnimationFrame(() => entries.forEach((e) => drawSlot(e.target))));
 const slot = (draw) => {
   slots.push(draw);
   return `<div class="chart-slot" data-slot="${slots.length - 1}"></div>`;
@@ -267,8 +268,8 @@ function burndown() {
 }
 
 function velocity() {
-  const closed = store.sprints.filter((s) => s.status === 'closed').sort(sprintOrder).reverse().slice(-10);
-  if (!closed.length) return statCard('Velocity', empty('Shows up after the first closed sprint'));
+  const closed = store.sprints.filter((s) => sprintPhase(s) === 'past').sort(sprintOrder).reverse().slice(-10);
+  if (!closed.length) return statCard('Velocity', empty('Shows up after the first sprint ends'));
   const data = closed.map((s) => {
     const n = store.tasks.filter((t) => t.sprint_id === s.id && t.status === 'done').length;
     return { label: trunc(s.name, 12), value: n, tip: `${s.name}: ${n} done` };
