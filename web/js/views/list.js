@@ -328,9 +328,11 @@ function groups(roots) {
   }
   let keys = [...map.keys()];
   if (state.group === 'project') {
-    // Same order as everywhere else: each project followed by its subprojects; no project last.
+    // Groups follow the current sort by their first task: sorted by priority, the group with the most important task
+    // comes first. Sorted by title (or on a tie), projects keep their usual order: each project, then its subprojects.
     const order = new Map(projectList().map((p, i) => [p.id, i]));
-    keys.sort((a, b) => (a === '') - (b === '') || order.get(a) - order.get(b));
+    const byTask = state.sort !== 'title';
+    keys.sort((a, b) => (byTask && cmp(map.get(a)[0], map.get(b)[0])) || (a === '') - (b === '') || order.get(a) - order.get(b));
     return keys.map((k) => ({ name: k === '' ? 'No project' : projectLabel(k), color: k === '' ? null : projectColor(k), items: map.get(k) }));
   }
   if (state.group === 'status') {
