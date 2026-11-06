@@ -1,7 +1,7 @@
 // Modal dialogs: task editor and sprint editor (one shared <dialog>).
 import {
   store, taskById, childrenOf, descendants, projectList, projectLabel, isSelectable, createProject, sprintById, sprintOrder, sprintPhase, prioritySlots,
-  createTask, updateTask, deleteTask, createSprint, updateSprint, deleteSprint, maxlength, maxNumber,
+  createTask, updateTask, deleteTask, archiveTask, createSprint, updateSprint, deleteSprint, maxlength, maxNumber,
 } from './store.js';
 import {
   PRIORITIES, STATUSES, esc, opt, prioIcon, today, addDays, fmtDate, fmtTs, fmtNum, statusName, prioName, toast,
@@ -55,7 +55,7 @@ function relationSection(name, title, hint, tasks, selected) {
     ${sorted.length ? `<input type="search" class="dep-filter" placeholder="Filter…">
     <div class="dep-list">${sorted.map((d) => `<label class="check" data-title="${esc(d.title.toLowerCase())}">
       <input type="checkbox" name="${name}" value="${d.id}" ${selected.includes(d.id) ? 'checked' : ''}>
-      ${esc(d.title)}${d.status === 'done' ? ' <span class="muted">(done)</span>' : ''}</label>`).join('')}</div>`
+      ${esc(d.title)}${d.archived_at ? ' <span class="muted">(archived)</span>' : d.status === 'done' ? ' <span class="muted">(done)</span>' : ''}</label>`).join('')}</div>`
     : '<p class="muted">No other tasks yet.</p>'}
   </details>`;
 }
@@ -78,6 +78,7 @@ function historyLine(h) {
   let text;
   if (h.field === 'created') text = 'created';
   else if (h.field === 'deleted') text = 'deleted';
+  else if (h.field === 'archived_at') text = h.to ? 'archived' : 'restored from the archive';
   else text = `${FIELD_NAMES[h.field] ?? h.field}: ${esc(fmtValue(h.field, h.from))} → ${esc(fmtValue(h.field, h.to))}`;
   return `<li><time>${fmtTs(h.ts)}</time> ${text}</li>`;
 }
@@ -92,12 +93,15 @@ export function openTaskEditor(task = null, preset = {}) {
   let progress = [...t.progress];
 
   const banned = new Set(isNew ? [] : [t.id, ...descendants(t.id).map((d) => d.id)]);
-  const parents = store.tasks.filter((x) => !banned.has(x.id) && x.status !== 'done' || x.id === t.parent_id)
+  // The current parent stays in the list even when it is done or archived, so saving doesn't detach the task.
+  const parents = [...store.tasks, ...store.archived].filter((x) => !banned.has(x.id) && x.status !== 'done' && !x.archived_at || x.id === t.parent_id)
     .sort((a, b) => a.title.localeCompare(b.title, 'ru'));
   // "Blocked by" is stored on this task (depends_on). "Blocking" is the reverse: tasks whose depends_on holds this one.
   const blockedBy = t.depends_on;
-  const blocking = isNew ? [] : store.tasks.filter((x) => x.depends_on.includes(t.id)).map((x) => x.id);
-  const others = store.tasks.filter((x) => x.id !== t.id);
+  const blocking = isNew ? [] : [...store.tasks, ...store.archived].filter((x) => x.depends_on.includes(t.id)).map((x) => x.id);
+  // Archived tasks show up only when already linked to this one, so saving keeps those links.
+  const linked = new Set([...blockedBy, ...blocking, ...(t.related ?? [])]);
+  const others = [...store.tasks, ...store.archived.filter((x) => linked.has(x.id))].filter((x) => x.id !== t.id);
   const sprints = store.sprints.filter((s) => sprintPhase(s) !== 'past' || s.id === t.sprint_id).sort(sprintOrder);
   const kids = isNew ? [] : childrenOf(t.id);
   const history = isNew ? [] : store.history.filter((h) => h.task_id === t.id).slice(-10).reverse();
@@ -108,7 +112,7 @@ export function openTaskEditor(task = null, preset = {}) {
   dlg.innerHTML = `
   <form class="editor" novalidate>
     <header>
-      <h2>${isNew ? (t.parent_id ? 'New subtask' : 'New task') : `Task #${t.id}`}</h2>
+      <h2>${isNew ? (t.parent_id ? 'New subtask' : 'New task') : `Task #${t.id}`}${t.archived_at ? ` <span class="badge">${icon('archive', 12)} archived ${fmtDate(t.archived_at)}</span>` : ''}</h2>
       <button type="button" class="icon" data-act="close" title="Close (Esc)">${icon('x')}</button>
     </header>
     <input name="title" class="title-input" placeholder="What needs to be done?" value="${esc(t.title)}" autocomplete="off" autofocus ${maxlength('task_title')}>
@@ -160,6 +164,7 @@ export function openTaskEditor(task = null, preset = {}) {
 
     <footer>
       ${isNew ? '' : '<button type="button" class="danger" data-act="delete">Delete</button>'}
+      ${isNew ? '' : `<button type="button" data-act="archive">${icon(t.archived_at ? 'undo' : 'archive', 14)} ${t.archived_at ? 'Restore' : 'Archive'}</button>`}
       <span class="spacer"></span>
       <button type="button" data-act="close">Cancel</button>
       <button type="submit" class="primary">Save</button>
@@ -333,6 +338,8 @@ export function openTaskEditor(task = null, preset = {}) {
     if (act === 'add-project') addProject();
     if (act === 'cancel-project') newProjectRow.hidden = true;
     if (act === 'add-sub') leaveThen(() => openTaskEditor(null, { parent_id: t.id, project_id: t.project_id, sprint_id: t.sprint_id }));
+    // Archive / Restore: unsaved edits are dealt with first (save or discard), then the editor closes.
+    if (act === 'archive') leaveThen(() => { dlg.close(); archiveTask(t.id, !t.archived_at); });
     if (act === 'delete') {
       const n = descendants(t.id).length;
       confirmDialog({

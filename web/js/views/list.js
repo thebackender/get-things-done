@@ -141,9 +141,8 @@ const select = (key, options) =>
 // don't take more than the sprint's limit. Filters don't apply here: it shows the whole sprint.
 let prioritizing = false;
 let rerender = null;
-
-/** Esc leaves the mode. Returns true if it was on. */
-export function exitPrioritize() {
+/** Esc leaves Prioritize mode. Returns true if it was on. */
+export function exitMode() {
   if (!prioritizing) return false;
   prioritizing = false;
   rerender?.();

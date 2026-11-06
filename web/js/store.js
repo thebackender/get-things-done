@@ -2,7 +2,8 @@
 import * as api from './api.js';
 import { OTHER_COLOR, paint, today, toast } from './util.js';
 
-export const store = { tasks: [], sprints: [], projects: [], history: [], canUndo: false, limits: {}, lastBackup: null };
+// tasks: the ones the views show; archived: tasks in the archive (archived_at set), shown only in the list's Archive view.
+export const store = { tasks: [], archived: [], sprints: [], projects: [], history: [], canUndo: false, limits: {}, lastBackup: null };
 
 const listeners = new Set();
 export const subscribe = (fn) => listeners.add(fn);
@@ -14,15 +15,16 @@ let projectOrder = [];
 
 export async function reload() {
   const state = await api.getState();
-  store.tasks = state.tasks;
+  store.tasks = state.tasks.filter((t) => !t.archived_at);
+  store.archived = state.tasks.filter((t) => t.archived_at);
   store.sprints = state.sprints;
   store.projects = state.projects;
   store.history = state.history;
   store.canUndo = state.can_undo;
   store.limits = state.limits ?? {};
   store.lastBackup = state.last_backup ?? null; // {time, file, dir}; no time when there is no backup yet
-  byId = new Map(store.tasks.map((t) => [t.id, t]));
-  kids = new Map();
+  byId = new Map(state.tasks.map((t) => [t.id, t])); // archived too: the editor and the history can still name them
+  kids = new Map(); // subtasks outside the archive
   for (const t of store.tasks) {
     if (t.parent_id == null) continue;
     if (!kids.has(t.parent_id)) kids.set(t.parent_id, []);
@@ -90,8 +92,8 @@ export function inBacklog(t) {
   return !s || sprintPhase(s) === 'past';
 }
 
-/** Unfinished tasks that t depends on. */
-export const blockers = (t) => t.depends_on.map(taskById).filter((d) => d && d.status !== 'done');
+/** Unfinished tasks that t depends on (an archived task no longer blocks anything). */
+export const blockers = (t) => t.depends_on.map(taskById).filter((d) => d && d.status !== 'done' && !d.archived_at);
 export const isOverdue = (t) => t.status !== 'done' && !!t.due && t.due < today();
 export const goalSum = (t) => t.progress.reduce((s, p) => s + Number(p.value || 0), 0);
 
@@ -144,6 +146,9 @@ export const createTask = (data) => run(api.post('/api/tasks', data));
 export const updateTask = (id, data) => run(api.put(`/api/tasks/${id}`, data));
 /** Several changes in one request, undone with a single Ctrl+Z. items = [{id, ...fields}] */
 export const updateTasks = (items) => run(api.post('/api/tasks/batch', { items }));
+/** Archive (or restore) a task together with its subtasks. */
+export const archiveTask = (id, archived = true) =>
+  run(api.put(`/api/tasks/${id}`, { archived }), archived ? 'Archived. Find it in Backlog → Archive' : 'Restored from the archive');
 export const deleteTask = (id) =>
   run(api.del(`/api/tasks/${id}`), (r) => `Deleted ${r.deleted.length} task(s). Ctrl+Z to restore`);
 export const addProgress = (id, value, date) => run(api.post(`/api/tasks/${id}/progress`, { value, date }));

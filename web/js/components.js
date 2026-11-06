@@ -1,5 +1,5 @@
 // Shared markup and behavior: task card, badges, drag and drop.
-import { taskById, childrenOf, descendants, blockers, isOverdue, goalSum, projectColor, projectLabel, addProgress, updateTask, deleteTask } from './store.js';
+import { taskById, childrenOf, descendants, blockers, isOverdue, goalSum, projectColor, projectLabel, addProgress, updateTask, deleteTask, archiveTask } from './store.js';
 import { openTaskEditor } from './editor.js';
 import { esc, fmtDate, fmtNum, prioIcon, prioClass, toast } from './util.js';
 import { icon } from './icons.js';
@@ -32,7 +32,7 @@ export function metaBadges(t) {
     parts.push(`<span class="badge" title="Subtasks">${icon('listChecks', 12)} ${done}/${kids.length}</span>`);
   }
   if (t.target != null) parts.push(goalBar(t));
-  const related = (t.related ?? []).map(taskById).filter(Boolean);
+  const related = (t.related ?? []).map(taskById).filter((r) => r && !r.archived_at);
   if (related.length) {
     const titles = related.map((r) => r.title).join(', ');
     parts.push(`<span class="badge related" title="Related: ${esc(titles)}">${icon('link', 12)} ${related.length}</span>`);
@@ -179,6 +179,12 @@ document.addEventListener('scroll', closeContextMenu, true);
 export function taskMenuItems(t) {
   const done = t.status === 'done';
   const subs = descendants(t.id).length;
+  if (t.archived_at) {
+    return [
+      { label: 'Restore from archive', icon: 'undo', action: () => archiveTask(t.id, false) },
+      { label: 'Edit', icon: 'pencil', action: () => openTaskEditor(t) },
+    ];
+  }
   return [
     { label: 'Add subtask', icon: 'plus', action: () => openTaskEditor(null, { parent_id: t.id, project_id: t.project_id, sprint_id: t.sprint_id }) },
     { label: 'Edit', icon: 'pencil', action: () => openTaskEditor(t) },
@@ -187,6 +193,7 @@ export function taskMenuItems(t) {
     t.parent_id != null && taskById(t.parent_id)
       ? { label: 'Make top-level', icon: 'cornerDownRight', action: () => updateTask(t.id, { parent_id: null }) } : undefined,
     null,
+    { label: subs ? 'Archive with subtasks' : 'Archive', icon: 'archive', action: () => archiveTask(t.id) },
     {
       label: 'Delete…', icon: 'x', danger: true,
       action: async () => {

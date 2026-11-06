@@ -464,6 +464,11 @@ button.more:hover:not(:disabled) { background: var(--accent); color: var(--foreg
 .row.dragging { opacity: 0.5; }
 /* Prioritize mode: one box per priority level, rows dragged by their grip, free slots shown dashed. */
 .prioritize-btn { height: 30px; padding: 0 10px; font-size: 13px; }
+/* Backlog → Archive: the button in the Backlog box, and the archived cards. */
+.archive-toggle { height: 30px; padding: 0 10px; font-size: 13px; gap: 6px; }
+.archive-pane .pane-head h2 { display: inline-flex; align-items: center; gap: 8px; }
+.card.arch .restore { height: 26px; padding: 0 8px; font-size: 12px; gap: 4px; margin-left: auto; flex: none; }
+.card.arch .card-meta .badge { display: inline-flex; align-items: center; gap: 4px; }
 .prio-board .prio-level { margin-bottom: 10px; }
 .prio-level h3 .count.over { color: var(--destructive); }
 .prio-level h3 .full-note { display: none; margin-left: auto; color: var(--destructive); text-transform: none; }

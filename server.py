@@ -58,7 +58,7 @@ LIMITS = {
 PRIORITY_NAMES = {3: "Critical", 2: "Highest", 1: "High", 0: "Medium", -1: "Low", -2: "Lowest"}
 MAX_BODY_BYTES = 1024 * 1024  # one API request
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")  # names the API answers to (see Handler.check_caller)
-TRACKED_FIELDS = ("status", "sprint_id", "priority", "due")
+TRACKED_FIELDS = ("status", "sprint_id", "priority", "due", "archived_at")
 
 TASK_DEFAULTS = {
     "title": "",
@@ -77,6 +77,7 @@ TASK_DEFAULTS = {
     "progress": [],
     "created": None,
     "done_at": None,
+    "archived_at": None,  # date it went to the archive: hidden from the views, kept in the file; None = not archived
     "is_deleted": False,
 }
 # A sprint has no status: it is current while today is between start and end.
@@ -434,7 +435,7 @@ def clean_task(payload):
     """Keep only known task fields and coerce them to the right types."""
     out = {}
     for key, value in payload.items():
-        if key not in TASK_DEFAULTS or key in ("created", "done_at", "is_deleted"):
+        if key not in TASK_DEFAULTS or key in ("created", "done_at", "archived_at", "is_deleted"):
             continue
         if key == "title":
             value = as_str(value).strip()
@@ -642,15 +643,15 @@ def check_sprint_priority(data, task, before=None):
     unfinished tasks are in the backlog."""
     limit = LIMITS["sprint_priorities"].get(str(task["priority"]))
     sprint_id = task["sprint_id"]
-    if limit is None or sprint_id is None or task["status"] == "done":
+    if limit is None or sprint_id is None or task["status"] == "done" or task["archived_at"]:
         return
     if before and before["sprint_id"] == sprint_id and before["priority"] == task["priority"]:
         return
     sprint = next((s for s in live(data["sprints"]) if s["id"] == sprint_id), None)
     if not sprint or (sprint["end"] and sprint["end"] < today()):
         return
-    count = sum(1 for t in live(data["tasks"])
-                if t["sprint_id"] == sprint_id and t["priority"] == task["priority"] and t["status"] != "done")
+    count = sum(1 for t in live(data["tasks"]) if t["sprint_id"] == sprint_id and t["priority"] == task["priority"]
+                and t["status"] != "done" and not t["archived_at"])
     if count > limit:
         name = PRIORITY_NAMES[task["priority"]]
         raise ApiError(f'"{sprint["name"]}" already has {limit} unfinished {name} tasks, the most a sprint can have. '
@@ -691,7 +692,21 @@ def update_task(data, task_id, payload):
         goal_reached = apply_goal(task)
     apply_done_at(task)
     log_changes(data, before, task)
+    if "archived" in payload:
+        apply_archive(data, task, bool(payload["archived"]))
     return {"item": task, "goal_reached": goal_reached}
+
+
+def apply_archive(data, task, archived):
+    """payload {"archived": true / false}: put the task and its subtasks into the archive, or take them out.
+    Archived tasks stay in the file with archived_at (the date); the UI leaves them out of the views."""
+    ids = {task["id"]} | descendant_ids(live(data["tasks"]), task["id"])
+    for t in live(data["tasks"]):
+        if t["id"] not in ids or bool(t["archived_at"]) == archived:
+            continue
+        old = t["archived_at"]
+        t["archived_at"] = today() if archived else None
+        log(data, t["id"], "archived_at", old, t["archived_at"])
 
 
 def batch_update(data, payload):
